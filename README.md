@@ -163,19 +163,19 @@ goodbot scan --analyze    # Include dependency analysis summary
 
 ### `goodbot analyze`
 
-Deep architectural analysis — the killer feature. Parses every import in your codebase, builds a dependency graph, and checks it against software architecture principles.
+Deep architectural analysis — the killer feature. Parses every import in your codebase, builds a dependency graph, checks SOLID principles, and gives you a health grade.
 
 ```
 $ goodbot analyze
 
-✔ Analysis complete (158ms)
+✔ Analysis complete (203ms)
 
-Dependency Analysis
-──────────────────────────────────────────────────
-  Modules            14
-  Cross-module edges 52
-  Files parsed       193
-  Time               158ms
+  Health Grade:  B+  (80/100)
+
+  Dependencies     ███████░░░ 65
+  Stability        ██████████ 100
+  SOLID            █████████░ 91
+  Architecture     ███████░░░ 70
 
 Module Stability
 ──────────────────────────────────────────────────
@@ -183,43 +183,116 @@ Module Stability
   constants               5    0  0.00 ██████████
   types                  11    0  0.00 ██████████
   utils                   8    1  0.11 █████████░
-  config                  4    2  0.33 ███████░░░
-  api                     4    4  0.50 █████░░░░░
   services                4    4  0.50 █████░░░░░
-  contexts                6    7  0.54 █████░░░░░
-  hooks                   2    4  0.67 ███░░░░░░░
-  components              2    8  0.80 ██░░░░░░░░
   screens                 1   11  0.92 █░░░░░░░░░
-  navigation              0    4  1.00 ░░░░░░░░░░
 
-Circular Dependencies (2)
+SOLID Analysis
 ──────────────────────────────────────────────────
-  ⚠ debug → contexts → debug
-    src/debug/useDebugCanvas.ts:2 → ../contexts
-    src/contexts/SketchContext.tsx:27 → ../debug
+  SRP (Single Responsibility)      ████████░░ 75
+  DIP (Dependency Inversion)       ██████████ 100
+  ISP (Interface Segregation)      ██████████ 99
 
-Layer Violations (1)
-──────────────────────────────────────────────────
-  ✗ debug (L5) → contexts (L6)
-    src/debug/useDebugCanvas.ts:2 → ../contexts
-
-⚠ 3 total issues found.
+  ✗ [SRP] File has 999 lines (threshold: 300)
+    src/components/Canvas/layers/AngleProtractorDisplay.tsx
+    → Split into smaller, focused modules
 ```
 
 **What it checks:**
 
 | Analysis | What it does |
 |----------|-------------|
-| **Stability Metrics** | Calculates afferent coupling (Ca), efferent coupling (Ce), and instability (I = Ce/(Ca+Ce)) per module |
-| **Stable Dependency Principle** | Flags when a stable module depends on a less stable one — dependencies should flow toward stability |
-| **Circular Dependencies** | Finds cycles using Tarjan's strongly connected components algorithm |
-| **Layer Violations** | Validates imports flow downward only through your declared architecture layers |
-| **Barrel Violations** | Detects imports that bypass barrel files (e.g., `../services/orderService` instead of `../services`) |
+| **Health Grade (A+ to F)** | Single score combining all metrics — the thing you screenshot and share |
+| **SOLID Principles** | SRP (file size, mixed concerns), DIP (concrete vs abstract imports), ISP (barrel bloat) |
+| **Stability Metrics** | Afferent/efferent coupling and instability per module |
+| **Stable Dependency Principle** | Flags stable modules depending on unstable ones |
+| **Circular Dependencies** | Tarjan's SCC algorithm |
+| **Layer Violations** | Validates downward-only import flow |
+| **Barrel Violations** | Detects imports bypassing barrel files |
 
 | Flag | Description |
 |------|-------------|
 | `--json` | Output full analysis as JSON for programmatic consumption |
+| `--diagram` | Generate `architecture.md` with mermaid dependency graph |
 | `--path <path>` | Analyze a specific project directory |
+
+### `goodbot diff`
+
+Analyze only changed files. Shows violations introduced by your current branch — perfect for PR reviews and CI.
+
+```
+$ goodbot diff --base main
+
+  Health Grade:  B+  (80/100)
+
+Changes vs main
+──────────────────────────────────────────────────
+  Files changed      4
+  Layer violations   0
+  Barrel violations  0
+  SOLID violations   1
+
+Violations in Changed Files
+──────────────────────────────────────────────────
+  ⚠ [SRP] File has 450 lines (threshold: 300)
+    src/services/orderService.ts
+```
+
+| Flag | Description |
+|------|-------------|
+| `--base <branch>` | Base branch to compare against (default: main) |
+| `--json` | Output as JSON |
+
+### `goodbot watch`
+
+Continuous monitoring. Watches your source files and re-runs analysis on every change with a live dashboard.
+
+```
+$ goodbot watch
+
+  goodbot watching... (2:34:05 PM, 193 files, 158ms)
+
+  Health:  B+  (80/100)
+  ──────────────────────────────────────────────
+  Circular deps      2 (unchanged)
+  Layer violations   1 (unchanged)
+  Barrel violations  0
+  SDP violations     0
+  SOLID              5 errors, 12 warnings (-1)
+
+  Resolved:
+    ✓ [SRP] src/services/orderService.ts
+```
+
+Shows new and resolved violations in real-time as you code.
+
+---
+
+## Suppressing Violations
+
+Create `.goodbot/ignore` to suppress false positives:
+
+```
+# Ignore all violations in legacy code
+src/legacy/**
+
+# Ignore only SRP violations in specific files
+src/contexts/SketchContext.tsx SRP
+
+# Ignore barrel violations in test utilities
+src/test-utils/** BARREL
+```
+
+---
+
+## Mermaid Dependency Diagram
+
+Generate a visual architecture diagram that renders on GitHub:
+
+```bash
+goodbot analyze --diagram
+```
+
+Creates `architecture.md` with a mermaid graph showing module dependencies, color-coded by stability (green = stable, yellow = moderate, red = unstable).
 
 ---
 
@@ -316,15 +389,19 @@ goodbot auto-detects your stack and tailors the generated guidelines accordingly
 
 ## CI Integration
 
-Add `goodbot check` to your CI pipeline to catch guardrail drift:
-
 ```yaml
 # GitHub Actions
 - name: Check AI guardrails
   run: npx goodbot-ai check
+
+- name: Analyze changed files
+  run: npx goodbot-ai diff --base ${{ github.event.pull_request.base.ref }}
+
+- name: Full architecture analysis
+  run: npx goodbot-ai analyze --json > analysis.json
 ```
 
-Exit code 1 means files are out of sync — fail the build and keep your AI agents honest.
+All commands return exit code 1 on violations — fail the build and keep your AI agents honest.
 
 ---
 

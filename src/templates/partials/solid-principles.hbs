@@ -1,0 +1,42 @@
+## SOLID Principles
+
+Follow these principles in all code you write or modify.
+
+### S — Single Responsibility
+Each file and module should have **one reason to change**.
+{{#if hasLayers}}
+{{#each businessLogic.allowedIn}}
+- **{{this}}**: Business logic, data transformation, API orchestration
+{{/each}}
+{{#each businessLogic.forbiddenIn}}
+- **{{this}}**: UI rendering, user interaction — no business logic
+{{/each}}
+{{/if}}
+- Keep files under 300 lines. If a file is growing large, split it by responsibility.
+- A function that fetches data should not also format it for display.
+
+### O — Open/Closed
+Modules should be **open for extension, closed for modification**.
+- Prefer composition over inheritance.
+- Use callback patterns, strategy functions, and configuration objects instead of modifying existing code.
+- When adding a new variant (e.g., a new order type), extend — don't add another `if` branch.
+
+### L — Liskov Substitution
+Subtypes must be **substitutable** for their base types.
+- Never narrow the accepted input types of a function override.
+- Never broaden the possible error types a subclass may throw.
+- Honor all contracts and invariants of the base type.
+
+### I — Interface Segregation
+Keep interfaces **focused and minimal**.
+- Barrel files should not export everything — only what external consumers need.
+- If a consumer only uses 2 of 15 exports, the interface is too broad.
+- Prefer many small, focused modules over one large utility module.
+
+### D — Dependency Inversion
+Depend on **abstractions**, not concretions.
+{{#if hasBarrels}}
+- Always import from barrel files (`../services`), never from internal files (`../services/orderService`).
+{{/if}}
+- High-level modules (screens, hooks) should not know about low-level implementation details.
+- If a module provides `interfaces.ts`, depend on those abstractions.

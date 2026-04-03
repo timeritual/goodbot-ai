@@ -2,8 +2,8 @@ import { Command } from 'commander';
 import ora from 'ora';
 import chalk from 'chalk';
 import { runFullScan } from '../scanners/index.js';
-import { runDependencyAnalysis } from '../analyzers/index.js';
-import { renderAnalysisSummary } from './analyze.js';
+import { runFullAnalysis } from '../analyzers/index.js';
+import { renderFullAnalysisSummary } from './analyze.js';
 import { loadConfig } from '../config/index.js';
 import { log } from '../utils/index.js';
 
@@ -59,14 +59,14 @@ export const scanCommand = new Command('scan')
         if (cmds.build) log.table('build', cmds.build);
       }
 
-      // Optional dependency analysis
+      // Optional full analysis (dependencies + SOLID + health)
       if (opts.analyze) {
-        spinner.start('Analyzing dependencies...');
+        spinner.start('Analyzing architecture...');
         let config;
         try { config = await loadConfig(opts.path); } catch { /* no config */ }
-        const analysis = await runDependencyAnalysis(opts.path, result.structure, config);
-        spinner.succeed(`Analysis complete (${analysis.timeTakenMs}ms)`);
-        renderAnalysisSummary(analysis);
+        const analysis = await runFullAnalysis(opts.path, result.structure, config);
+        spinner.succeed(`Analysis complete (${analysis.dependency.timeTakenMs}ms)`);
+        renderFullAnalysisSummary(analysis);
       }
 
       console.log();

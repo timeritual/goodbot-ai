@@ -90,6 +90,67 @@ export interface DependencyAnalysis {
   timeTakenMs: number;
 }
 
+// ─── SOLID Analysis ───────────────────────────────────────
+
+export type SolidPrinciple = 'SRP' | 'OCP' | 'LSP' | 'ISP' | 'DIP';
+export type ViolationSeverity = 'info' | 'warning' | 'error';
+
+export interface SolidViolation {
+  principle: SolidPrinciple;
+  severity: ViolationSeverity;
+  file: string;
+  line?: number;
+  message: string;
+  suggestion: string;
+}
+
+export interface SolidScores {
+  srp: number;   // 0-100
+  dip: number;   // 0-100
+  isp: number;   // 0-100
+  overall: number;
+}
+
+export interface SolidAnalysis {
+  violations: SolidViolation[];
+  scores: SolidScores;
+}
+
+export interface AnalysisThresholds {
+  maxFileLines: number;
+  maxBarrelExports: number;
+  maxModuleCoupling: number;
+}
+
+export const DEFAULT_THRESHOLDS: AnalysisThresholds = {
+  maxFileLines: 300,
+  maxBarrelExports: 15,
+  maxModuleCoupling: 8,
+};
+
+// ─── Health Score ─────────────────────────────────────────
+
+export type HealthGrade = 'A+' | 'A' | 'B+' | 'B' | 'C+' | 'C' | 'D' | 'F';
+
+export interface HealthScore {
+  grade: HealthGrade;
+  score: number;        // 0-100
+  breakdown: {
+    dependencies: number;  // 0-100
+    stability: number;
+    solid: number;
+    architecture: number;
+  };
+}
+
+// ─── Full Analysis Result ─────────────────────────────────
+
+export interface FullAnalysis {
+  dependency: DependencyAnalysis;
+  solid: SolidAnalysis;
+  health: HealthScore;
+}
+
 /** Lightweight summary for generator context */
 export interface DependencyAnalysisSummary {
   moduleCount: number;

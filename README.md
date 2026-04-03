@@ -10,7 +10,8 @@
 
 <p align="center">
   <strong>Train your AI to be a good bot.</strong><br/>
-  Auto-generate guardrail files that keep AI coding agents aligned with your project's conventions.
+  Auto-generate guardrail files that keep AI coding agents aligned with your project's conventions.<br/>
+  SOLID principles analysis. Health grades. Continuous monitoring.
 </p>
 
 <p align="center">
@@ -24,6 +25,7 @@
 AI coding agents (Claude, Cursor, Copilot, Windsurf, Codex) are powerful — but they don't know your project's rules. Without guardrails, they will:
 
 - **Break your architecture** — import from internal files instead of barrels, mix business logic into UI components, bypass your layer boundaries
+- **Violate SOLID principles** — create god files, depend on concretions instead of abstractions, build fat interfaces
 - **Ignore your conventions** — wrong naming, wrong patterns, wrong file locations
 - **Introduce regressions** — skip your verification checklist, miss type checks, forget to run tests
 - **Drift across agents** — your Claude instructions say one thing, your Cursor rules say another, and your Codex config says nothing at all
@@ -32,35 +34,22 @@ Every team using AI agents ends up writing the same boilerplate: `CLAUDE.md`, `.
 
 ## The Solution
 
-**goodbot** scans your codebase, detects your framework, language, architecture, and conventions — then generates a complete set of AI agent guardrail files from a single source of truth.
+**goodbot** scans your codebase, detects your framework, language, architecture, and conventions — then generates a complete set of AI agent guardrail files from a single source of truth. It also continuously analyzes your codebase for architectural violations, SOLID principle adherence, and gives you a single health grade.
 
 ```
-$ goodbot scan
+$ goodbot analyze
 
-✔ Scan complete
+✔ Analysis complete (203ms)
 
-Project Analysis
-─────────────────────────────────────────────
-  Project            my-app
-  Framework          react-native (package.json → "react-native")
-  Confidence         high
-  Language           typescript
-  Src root           src
-  Barrel files       yes
-  Interface files    yes
+  Health Grade:  B+  (80/100)
 
-Detected Layers
-─────────────────────────────────────────────
-  L0 types              src/types            barrel
-  L1 utils              src/utils            barrel
-  L3 api                src/api              barrel, interfaces
-  L4 services           src/services         barrel, interfaces
-  L6 hooks              src/hooks            barrel, interfaces
-  L7 components         src/components       barrel
-  L8 screens            src/screens          no barrel
+  Dependencies     ███████░░░ 65
+  Stability        ██████████ 100
+  SOLID            █████████░ 91
+  Architecture     ███████░░░ 70
 ```
 
-One command generates all your agent files. One config keeps them in sync. One check catches drift.
+One command generates all your agent files. One command grades your architecture. One command watches for violations in real-time.
 
 ---
 
@@ -73,8 +62,11 @@ npx goodbot-ai init
 # Generate all agent guardrail files
 npx goodbot-ai generate
 
-# Check for drift
-npx goodbot-ai check
+# Analyze your architecture
+npx goodbot-ai analyze
+
+# Watch for violations as you code
+npx goodbot-ai watch
 ```
 
 Or install globally:
@@ -158,7 +150,7 @@ Read-only analysis of your project. No files created, no config needed — just 
 ```bash
 goodbot scan
 goodbot scan --path /path/to/other/project
-goodbot scan --analyze    # Include dependency analysis summary
+goodbot scan --analyze    # Include health grade + architecture summary
 ```
 
 ### `goodbot analyze`
@@ -177,6 +169,12 @@ $ goodbot analyze
   SOLID            █████████░ 91
   Architecture     ███████░░░ 70
 
+Dependency Analysis
+──────────────────────────────────────────────────
+  Modules            14
+  Cross-module edges 52
+  Files parsed       193
+
 Module Stability
 ──────────────────────────────────────────────────
   Module                 Ca   Ce  Instability
@@ -185,6 +183,16 @@ Module Stability
   utils                   8    1  0.11 █████████░
   services                4    4  0.50 █████░░░░░
   screens                 1   11  0.92 █░░░░░░░░░
+  navigation              0    4  1.00 ░░░░░░░░░░
+
+Circular Dependencies (2)
+──────────────────────────────────────────────────
+  ⚠ debug → contexts → debug
+  ⚠ _root → components → _root
+
+Layer Violations (1)
+──────────────────────────────────────────────────
+  ✗ debug (L5) → contexts (L6)
 
 SOLID Analysis
 ──────────────────────────────────────────────────
@@ -195,6 +203,11 @@ SOLID Analysis
   ✗ [SRP] File has 999 lines (threshold: 300)
     src/components/Canvas/layers/AngleProtractorDisplay.tsx
     → Split into smaller, focused modules
+
+  ⚠ [SRP] File has 451 lines (threshold: 300)
+    src/api/sketchApi.ts
+
+⚠ 35 issues found.
 ```
 
 **What it checks:**
@@ -203,11 +216,11 @@ SOLID Analysis
 |----------|-------------|
 | **Health Grade (A+ to F)** | Single score combining all metrics — the thing you screenshot and share |
 | **SOLID Principles** | SRP (file size, mixed concerns), DIP (concrete vs abstract imports), ISP (barrel bloat) |
-| **Stability Metrics** | Afferent/efferent coupling and instability per module |
-| **Stable Dependency Principle** | Flags stable modules depending on unstable ones |
-| **Circular Dependencies** | Tarjan's SCC algorithm |
-| **Layer Violations** | Validates downward-only import flow |
-| **Barrel Violations** | Detects imports bypassing barrel files |
+| **Stability Metrics** | Afferent coupling (Ca), efferent coupling (Ce), and instability (I = Ce/(Ca+Ce)) per module |
+| **Stable Dependency Principle** | Flags when a stable module depends on a less stable one |
+| **Circular Dependencies** | Finds cycles using Tarjan's strongly connected components algorithm |
+| **Layer Violations** | Validates imports flow downward only through your declared architecture layers |
+| **Barrel Violations** | Detects imports that bypass barrel files (e.g., `../services/orderService` instead of `../services`) |
 
 | Flag | Description |
 |------|-------------|
@@ -217,7 +230,7 @@ SOLID Analysis
 
 ### `goodbot diff`
 
-Analyze only changed files. Shows violations introduced by your current branch — perfect for PR reviews and CI.
+Analyze only changed files. Shows violations introduced by your current branch — perfect for PR reviews and CI. Doesn't show 50 existing violations, just the delta.
 
 ```
 $ goodbot diff --base main
@@ -235,6 +248,8 @@ Violations in Changed Files
 ──────────────────────────────────────────────────
   ⚠ [SRP] File has 450 lines (threshold: 300)
     src/services/orderService.ts
+
+⚠ 1 violation in changed files.
 ```
 
 | Flag | Description |
@@ -263,7 +278,47 @@ $ goodbot watch
     ✓ [SRP] src/services/orderService.ts
 ```
 
-Shows new and resolved violations in real-time as you code.
+Shows new and resolved violations in real-time as you code. Color-coded deltas so you immediately see if your changes are improving or degrading the architecture.
+
+---
+
+## Health Grade
+
+Every analysis produces a single **A+ to F** grade — the thing you screenshot and share.
+
+The grade is a weighted composite of four dimensions:
+
+| Dimension | Weight | What it measures |
+|-----------|--------|-----------------|
+| **Dependencies** | 30% | Circular deps, layer violations, barrel violations |
+| **Stability** | 20% | SDP violations (stable modules depending on unstable ones) |
+| **SOLID** | 25% | SRP, DIP, ISP principle adherence |
+| **Architecture** | 25% | Module count, coupling density, layer definition |
+
+| Grade | Score | Meaning |
+|-------|-------|---------|
+| A+ | 95-100 | Exceptional architecture |
+| A | 85-94 | Clean, well-structured |
+| B+ | 78-84 | Good with minor issues |
+| B | 70-77 | Solid but room for improvement |
+| C+ | 63-69 | Notable architectural debt |
+| C | 55-62 | Significant issues |
+| D | 40-54 | Major problems |
+| F | 0-39 | Architectural emergency |
+
+---
+
+## SOLID Principles
+
+goodbot checks three statically-analyzable SOLID principles and **generates guidelines for all five** in your CODING_GUIDELINES.md so AI agents follow them when writing code.
+
+| Principle | Checked | What it detects |
+|-----------|---------|-----------------|
+| **S** — Single Responsibility | Yes | Files over 300 lines, files importing from 4+ modules (mixed concerns) |
+| **O** — Open/Closed | Guidelines only | Generated guidelines teach composition over modification |
+| **L** — Liskov Substitution | Guidelines only | Generated guidelines teach contract honoring |
+| **I** — Interface Segregation | Yes | Barrel files exporting 15+ symbols (fat interfaces) |
+| **D** — Dependency Inversion | Yes | Importing concrete files when interfaces.ts exists in the target module |
 
 ---
 
@@ -286,13 +341,18 @@ src/test-utils/** BARREL
 
 ## Mermaid Dependency Diagram
 
-Generate a visual architecture diagram that renders on GitHub:
+Generate a visual architecture diagram that renders beautifully on GitHub:
 
 ```bash
 goodbot analyze --diagram
 ```
 
-Creates `architecture.md` with a mermaid graph showing module dependencies, color-coded by stability (green = stable, yellow = moderate, red = unstable).
+Creates `architecture.md` with a mermaid graph showing module dependencies, color-coded by stability:
+- **Green** = stable (low instability)
+- **Yellow** = moderate
+- **Red** = unstable (high instability)
+
+Includes a stability metrics table and lists any circular dependencies or layer violations.
 
 ---
 
@@ -300,14 +360,15 @@ Creates `architecture.md` with a mermaid graph showing module dependencies, colo
 
 | File | Who reads it | Purpose |
 |------|-------------|---------|
-| `CODING_GUIDELINES.md` | All agents + humans | The source of truth — architecture, import rules, business logic placement, verification checklist, code style |
+| `CODING_GUIDELINES.md` | All agents + humans | Architecture, import rules, SOLID principles, business logic placement, verification checklist |
 | `CLAUDE.md` | Claude Code, Claude in IDEs | Points to CODING_GUIDELINES.md + quick reference |
 | `.cursorrules` | Cursor AI | Points to CODING_GUIDELINES.md |
 | `.windsurfrules` | Windsurf AI | Points to CODING_GUIDELINES.md |
 | `AGENTS.md` | OpenAI Codex | Points to CODING_GUIDELINES.md |
 | `.cursorignore` | Cursor AI | Keeps build artifacts, secrets, and noise out of AI context |
+| `architecture.md` | All agents + humans | Mermaid dependency diagram (via `--diagram` flag) |
 
-The key insight: **CODING_GUIDELINES.md is the single source of truth**. All agent-specific files simply point to it. This eliminates drift between agents and keeps maintenance to one file.
+The key insight: **CODING_GUIDELINES.md is the single source of truth**. All agent-specific files simply point to it. This eliminates drift between agents and keeps maintenance to one file. The generated guidelines include SOLID principles tailored to your framework.
 
 ---
 
@@ -405,6 +466,20 @@ All commands return exit code 1 on violations — fail the build and keep your A
 
 ---
 
+## Command Reference
+
+| Command | Description |
+|---------|-------------|
+| `goodbot init` | Interactive project setup |
+| `goodbot generate` | Generate AI agent guardrail files |
+| `goodbot check` | Detect drift in generated files |
+| `goodbot scan` | Read-only project analysis |
+| `goodbot analyze` | Deep architecture + SOLID analysis with health grade |
+| `goodbot diff` | Analyze only changed files vs base branch |
+| `goodbot watch` | Continuous live monitoring dashboard |
+
+---
+
 ## Why "goodbot"?
 
 Because AI coding agents are like eager interns — incredibly fast, surprisingly capable, but they need clear rules to follow. **goodbot** is obedience training for your AI. Set the rules once, enforce them everywhere, and your AI becomes a good bot.
@@ -414,7 +489,7 @@ Because AI coding agents are like eager interns — incredibly fast, surprisingl
 ## Contributing
 
 ```bash
-git clone https://github.com/protocoding/goodbot-ai.git
+git clone https://github.com/timeritual/goodbot-ai.git
 cd goodbot-ai
 npm install
 npx tsx src/index.ts --help    # Run in dev mode
@@ -427,5 +502,5 @@ npx tsx src/index.ts --help    # Run in dev mode
 MIT
 
 <p align="center">
-  <sub>Built by <a href="https://github.com/protocoding">protocoding</a></sub>
+  <sub>Built by <a href="https://github.com/timeritual">timeritual</a></sub>
 </p>

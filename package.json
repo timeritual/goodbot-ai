@@ -1,0 +1,58 @@
+{
+  "name": "goodbot-ai",
+  "version": "0.1.0",
+  "description": "Auto-generate AI agent guardrail files for your project. Train your AI to be a good bot.",
+  "type": "module",
+  "bin": {
+    "goodbot": "./bin/goodbot.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/",
+    "bin/"
+  ],
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.build.json && npm run copy-templates",
+    "copy-templates": "cp -r src/templates dist/templates",
+    "start": "node dist/index.js",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "guardrails",
+    "claude",
+    "cursor",
+    "windsurf",
+    "codex",
+    "copilot",
+    "cli",
+    "coding-standards",
+    "vibe-coding"
+  ],
+  "author": "protocoding",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "handlebars": "^4.7.8",
+    "inquirer": "^9.3.0",
+    "ora": "^8.0.1",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}

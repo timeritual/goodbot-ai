@@ -1,0 +1,8 @@
+### Architecture Rules
+
+- Dependencies flow **downward only** — higher layers import from lower layers, never the reverse
+- Each module exposes its public API through a barrel file (`index.ts`)
+- Internal implementation details stay private to the module
+{{#if architecture.interfaceContracts}}
+- Public functions use TypeScript `satisfies` checks against interface contracts
+{{/if}}

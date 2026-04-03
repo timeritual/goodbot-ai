@@ -1,0 +1,18 @@
+### Business Logic Placement
+
+{{#if businessLogic.allowedIn.length}}
+Business logic **must** live in: {{#each businessLogic.allowedIn}}**{{this}}**{{#unless @last}}, {{/unless}}{{/each}}
+
+{{#if businessLogic.forbiddenIn.length}}
+Business logic **must NOT** live in: {{#each businessLogic.forbiddenIn}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+{{/if}}
+
+| Layer | Should Contain | Should NOT Contain |
+|-------|---------------|-------------------|
+{{#each businessLogic.allowedIn}}
+| **{{this}}** | API calls, validation, caching, business rules | UI rendering, navigation |
+{{/each}}
+{{#each businessLogic.forbiddenIn}}
+| **{{this}}** | UI rendering, state wiring, navigation | Direct API calls, data transformation |
+{{/each}}
+{{/if}}

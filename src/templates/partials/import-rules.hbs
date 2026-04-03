@@ -1,0 +1,19 @@
+### Import Rules
+
+{{#ifEquals architecture.barrelImportRule "always"}}
+**Always import from barrel files** (e.g., `../services`, `../hooks`), never from internal files like `../services/orderService`.
+
+This is enforced by ESLint `import/no-restricted-paths` — CI will fail on violations.
+
+Example:
+```
+// ✓ Correct
+import { myFunction } from '../services';
+
+// ✗ Wrong — bypasses barrel
+import { myFunction } from '../services/myService';
+```
+{{/ifEquals}}
+{{#ifEquals architecture.barrelImportRule "recommended"}}
+Prefer importing from barrel files (e.g., `../services`) where they exist, rather than importing internal files directly.
+{{/ifEquals}}

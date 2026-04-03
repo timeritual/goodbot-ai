@@ -8,6 +8,7 @@ import {
   frameworkDefaults,
   type GoodbotConfig,
 } from '../config/index.js';
+import { buildPresetConfig, PRESET_DESCRIPTIONS, type PresetName } from '../config/presets.js';
 import { log } from '../utils/index.js';
 import type { Framework, Language } from '../scanners/types.js';
 
@@ -22,6 +23,7 @@ export const initCommand = new Command('init')
   .description('Initialize goodbot configuration for your project')
   .option('-p, --path <path>', 'Project path', process.cwd())
   .option('--force', 'Overwrite existing config', false)
+  .option('--preset <preset>', 'Use a preset: strict, recommended, or relaxed')
   .action(async (opts) => {
     const projectRoot = opts.path;
 
@@ -44,6 +46,22 @@ export const initCommand = new Command('init')
     const spinner = ora('Scanning project...').start();
     const scan = await runFullScan(projectRoot);
     spinner.succeed('Scan complete');
+
+    // Fast path: preset mode
+    if (opts.preset) {
+      const preset = opts.preset as PresetName;
+      if (!['strict', 'recommended', 'relaxed'].includes(preset)) {
+        log.error(`Unknown preset "${preset}". Use: strict, recommended, or relaxed.`);
+        process.exit(1);
+      }
+
+      const config = buildPresetConfig(preset, scan);
+      await saveConfig(projectRoot, config);
+      log.success(`Config saved with "${preset}" preset to .goodbot/config.json`);
+      log.dim(PRESET_DESCRIPTIONS[preset]);
+      log.dim('Run `goodbot generate` to create your agent files.');
+      return;
+    }
 
     // Phase 2: Interactive prompts
     const answers = await inquirer.prompt([

@@ -76,13 +76,30 @@ npm install -g goodbot-ai
 goodbot init
 ```
 
+Or skip the interactive flow entirely with a preset:
+
+```bash
+npx goodbot-ai init --preset recommended   # Balanced defaults
+npx goodbot-ai init --preset strict         # Maximum enforcement
+npx goodbot-ai init --preset relaxed        # Minimal guardrails
+```
+
 ---
 
 ## Commands
 
 ### `goodbot init`
 
-Interactive setup that scans your project and walks you through configuration.
+Interactive setup that scans your project and walks you through configuration. Or use `--preset` to skip the prompts entirely.
+
+```
+$ goodbot init --preset recommended
+
+✔ Scan complete
+✓ Config saved with "recommended" preset to .goodbot/config.json
+```
+
+Full interactive mode:
 
 ```
 $ goodbot init
@@ -280,6 +297,70 @@ $ goodbot watch
 
 Shows new and resolved violations in real-time as you code. Color-coded deltas so you immediately see if your changes are improving or degrading the architecture.
 
+### `goodbot fix`
+
+Auto-fix what it can. Generates missing barrel files, adds split markers to oversized files, creates missing `.cursorignore`.
+
+```
+$ goodbot fix --dry-run
+
+✔ Analysis complete
+  ~ src/components/Canvas/operations/SelectionOperations.ts — 3 suggested split points:
+    Line 311: // --- split: find-closest-shape.ts ---
+    Line 499: // --- split: is-point-near-midpoint-circle.ts ---
+    Line 639: // --- split: find-closest-independent-line.ts ---
+  + Would create src/features/index.ts
+
+ℹ 2 fixes available. Run `goodbot fix` to apply.
+```
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Preview fixes without applying |
+
+### `goodbot score`
+
+Just the health grade. One line. Fast enough for terminal prompts and git hooks.
+
+```
+$ goodbot score
+B+ (80/100)
+```
+
+Exits with code 1 if grade is D or F — use it as a pre-commit hook:
+
+```bash
+# .husky/pre-commit
+goodbot score --no-color || echo "Architecture health too low!"
+```
+
+### `goodbot pr`
+
+Generate a markdown PR description with architectural impact. Copy-paste into your pull request.
+
+```
+$ goodbot pr --base main
+
+─── Copy below this line ───
+
+## Architecture Impact
+
+| Metric | Value |
+|--------|-------|
+| Health Grade | 🔵 **B+** (80/100) |
+| Files Changed | 11 (9 source) |
+| Violations in PR | 0 ✅ |
+| Modules | 14 |
+| Circular Deps | 2 ⚠️ |
+
+─── Copy above this line ───
+```
+
+| Flag | Description |
+|------|-------------|
+| `--base <branch>` | Base branch to compare against (default: main) |
+| `--copy` | Copy to clipboard (macOS) |
+
 ---
 
 ## Health Grade
@@ -470,13 +551,16 @@ All commands return exit code 1 on violations — fail the build and keep your A
 
 | Command | Description |
 |---------|-------------|
-| `goodbot init` | Interactive project setup |
+| `goodbot init` | Interactive project setup (or `--preset strict\|recommended\|relaxed`) |
 | `goodbot generate` | Generate AI agent guardrail files |
 | `goodbot check` | Detect drift in generated files |
 | `goodbot scan` | Read-only project analysis |
 | `goodbot analyze` | Deep architecture + SOLID analysis with health grade |
 | `goodbot diff` | Analyze only changed files vs base branch |
 | `goodbot watch` | Continuous live monitoring dashboard |
+| `goodbot fix` | Auto-fix violations (missing barrels, split markers) |
+| `goodbot score` | One-line health grade (for scripts and git hooks) |
+| `goodbot pr` | Generate PR description with architectural impact |
 
 ---
 

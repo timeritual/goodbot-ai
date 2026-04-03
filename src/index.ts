@@ -6,6 +6,9 @@ import { checkCommand } from './commands/check.js';
 import { analyzeCommand } from './commands/analyze.js';
 import { diffCommand } from './commands/diff.js';
 import { watchCommand } from './commands/watch.js';
+import { fixCommand } from './commands/fix.js';
+import { scoreCommand } from './commands/score.js';
+import { prCommand } from './commands/pr.js';
 
 const program = new Command();
 
@@ -21,5 +24,8 @@ program.addCommand(checkCommand);
 program.addCommand(analyzeCommand);
 program.addCommand(diffCommand);
 program.addCommand(watchCommand);
+program.addCommand(fixCommand);
+program.addCommand(scoreCommand);
+program.addCommand(prCommand);
 
 program.parse();

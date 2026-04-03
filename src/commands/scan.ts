@@ -2,11 +2,15 @@ import { Command } from 'commander';
 import ora from 'ora';
 import chalk from 'chalk';
 import { runFullScan } from '../scanners/index.js';
+import { runDependencyAnalysis } from '../analyzers/index.js';
+import { renderAnalysisSummary } from './analyze.js';
+import { loadConfig } from '../config/index.js';
 import { log } from '../utils/index.js';
 
 export const scanCommand = new Command('scan')
   .description('Analyze your project without generating any files')
   .option('-p, --path <path>', 'Project path to scan', process.cwd())
+  .option('-a, --analyze', 'Include dependency analysis', false)
   .action(async (opts) => {
     const spinner = ora('Scanning project...').start();
 
@@ -53,6 +57,16 @@ export const scanCommand = new Command('scan')
         if (cmds.test) log.table('test', cmds.test);
         if (cmds.format) log.table('format', cmds.format);
         if (cmds.build) log.table('build', cmds.build);
+      }
+
+      // Optional dependency analysis
+      if (opts.analyze) {
+        spinner.start('Analyzing dependencies...');
+        let config;
+        try { config = await loadConfig(opts.path); } catch { /* no config */ }
+        const analysis = await runDependencyAnalysis(opts.path, result.structure, config);
+        spinner.succeed(`Analysis complete (${analysis.timeTakenMs}ms)`);
+        renderAnalysisSummary(analysis);
       }
 
       console.log();

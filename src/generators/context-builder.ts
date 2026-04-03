@@ -1,4 +1,5 @@
 import type { GoodbotConfig } from '../config/index.js';
+import type { DependencyAnalysisSummary } from '../analyzers/types.js';
 import type { GeneratorContext } from './types.js';
 
 function buildLayerDiagram(
@@ -23,7 +24,7 @@ function buildLayerDiagram(
   return lines.join('\n');
 }
 
-export function buildContext(config: GoodbotConfig): GeneratorContext {
+export function buildContext(config: GoodbotConfig, analysisSummary?: DependencyAnalysisSummary): GeneratorContext {
   const { project, architecture, businessLogic, verification, conventions, ignore } = config;
 
   const verificationCommands: Array<{ name: string; command: string }> = [];
@@ -56,5 +57,14 @@ export function buildContext(config: GoodbotConfig): GeneratorContext {
     hasRedFlags: businessLogic.redFlags.length > 0,
     hasCustomRules: conventions.customRules.length > 0,
     hasVerification: verificationCommands.length > 0,
+    dependencyAnalysis: analysisSummary ? {
+      moduleCount: analysisSummary.moduleCount,
+      circularDependencyCount: analysisSummary.circularDependencyCount,
+      barrelViolationCount: analysisSummary.barrelViolationCount,
+      layerViolationCount: analysisSummary.layerViolationCount,
+      stabilityViolationCount: analysisSummary.stabilityViolationCount,
+      topViolations: analysisSummary.topViolations,
+    } : undefined,
+    hasAnalysis: !!analysisSummary,
   };
 }

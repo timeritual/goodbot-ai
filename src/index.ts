@@ -3,6 +3,7 @@ import { scanCommand } from './commands/scan.js';
 import { initCommand } from './commands/init.js';
 import { generateCommand } from './commands/generate.js';
 import { checkCommand } from './commands/check.js';
+import { analyzeCommand } from './commands/analyze.js';
 
 const program = new Command();
 
@@ -15,5 +16,6 @@ program.addCommand(scanCommand);
 program.addCommand(initCommand);
 program.addCommand(generateCommand);
 program.addCommand(checkCommand);
+program.addCommand(analyzeCommand);
 
 program.parse();

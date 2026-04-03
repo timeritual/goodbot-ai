@@ -47,6 +47,16 @@ export interface GeneratorContext {
   hasRedFlags: boolean;
   hasCustomRules: boolean;
   hasVerification: boolean;
+  // Optional dependency analysis
+  dependencyAnalysis?: {
+    moduleCount: number;
+    circularDependencyCount: number;
+    barrelViolationCount: number;
+    layerViolationCount: number;
+    stabilityViolationCount: number;
+    topViolations: string[];
+  };
+  hasAnalysis: boolean;
 }
 
 export interface GeneratedFile {

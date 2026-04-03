@@ -1,0 +1,173 @@
+import { Command } from 'commander';
+import path from 'node:path';
+import ora from 'ora';
+import chalk from 'chalk';
+import { runFullScan } from '../scanners/index.js';
+import { runFullAnalysis } from '../analyzers/index.js';
+import { loadConfig } from '../config/index.js';
+import { log, safeWriteFile } from '../utils/index.js';
+import type { FullAnalysis, HealthGrade } from '../analyzers/types.js';
+
+interface RepoResult {
+  name: string;
+  path: string;
+  analysis: FullAnalysis;
+}
+
+export const reportCommand = new Command('report')
+  .description('Generate a combined health report across multiple repos')
+  .argument('<paths...>', 'Paths to project directories')
+  .option('--output <file>', 'Write markdown report to file')
+  .option('--json', 'Output as JSON', false)
+  .action(async (paths: string[], opts) => {
+    const spinner = ora('Analyzing repos...').start();
+    const results: RepoResult[] = [];
+
+    for (const repoPath of paths) {
+      const resolved = path.resolve(repoPath);
+      spinner.text = `Analyzing ${path.basename(resolved)}...`;
+
+      try {
+        const scan = await runFullScan(resolved);
+        let config;
+        try { config = await loadConfig(resolved); } catch { /* no config */ }
+
+        const analysis = await runFullAnalysis(resolved, scan.structure, config);
+        results.push({
+          name: scan.projectName,
+          path: resolved,
+          analysis,
+        });
+      } catch (err) {
+        log.warn(`Skipped ${repoPath}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    spinner.succeed(`Analyzed ${results.length} repos`);
+
+    if (results.length === 0) {
+      log.error('No repos analyzed successfully.');
+      process.exit(1);
+    }
+
+    if (opts.json) {
+      const output = results.map((r) => ({
+        name: r.name,
+        path: r.path,
+        health: r.analysis.health,
+        violations: {
+          circular: r.analysis.dependency.circularDependencies.length,
+          layer: r.analysis.dependency.layerViolations.length,
+          solid: r.analysis.solid.violations.filter((v) => v.severity === 'error').length,
+        },
+      }));
+      console.log(JSON.stringify(output, null, 2));
+      return;
+    }
+
+    if (opts.output) {
+      const markdown = generateMarkdownReport(results);
+      await safeWriteFile(opts.output, markdown);
+      log.success(`Report saved to ${opts.output}`);
+      return;
+    }
+
+    renderReport(results);
+  });
+
+function renderReport(results: RepoResult[]): void {
+  // Overall stats
+  const avgScore = Math.round(
+    results.reduce((sum, r) => sum + r.analysis.health.score, 0) / results.length,
+  );
+  const worstRepo = results.reduce((worst, r) =>
+    r.analysis.health.score < worst.analysis.health.score ? r : worst,
+  );
+  const bestRepo = results.reduce((best, r) =>
+    r.analysis.health.score > best.analysis.health.score ? r : best,
+  );
+
+  log.header('Multi-Repo Health Report');
+  console.log(chalk.dim('─'.repeat(60)));
+
+  log.table('Repos analyzed', String(results.length));
+  log.table('Average score', String(avgScore));
+  log.table('Best', `${bestRepo.name} — ${chalk.green(bestRepo.analysis.health.grade)} (${bestRepo.analysis.health.score})`);
+  log.table('Worst', `${worstRepo.name} — ${gradeColor(worstRepo.analysis.health.grade)(worstRepo.analysis.health.grade)} (${worstRepo.analysis.health.score})`);
+
+  // Per-repo table
+  console.log();
+  console.log(`  ${chalk.dim('Repo'.padEnd(24))} ${chalk.dim('Grade'.padEnd(8))} ${chalk.dim('Score'.padEnd(8))} ${chalk.dim('Circular'.padEnd(10))} ${chalk.dim('Layer'.padEnd(8))} ${chalk.dim('SOLID')}`);
+  console.log(chalk.dim('  ' + '─'.repeat(58)));
+
+  for (const r of results.sort((a, b) => b.analysis.health.score - a.analysis.health.score)) {
+    const h = r.analysis.health;
+    const d = r.analysis.dependency;
+    const s = r.analysis.solid;
+    const color = gradeColor(h.grade);
+
+    console.log(
+      `  ${r.name.padEnd(24)} ${color(h.grade.padEnd(8))} ${String(h.score).padEnd(8)} ` +
+      `${colorCount(d.circularDependencies.length).padEnd(10)} ` +
+      `${colorCount(d.layerViolations.length).padEnd(8)} ` +
+      `${colorCount(s.violations.filter((v) => v.severity === 'error').length)}`,
+    );
+  }
+
+  console.log();
+  const totalIssues = results.reduce((sum, r) => {
+    const d = r.analysis.dependency;
+    return sum + d.circularDependencies.length + d.layerViolations.length;
+  }, 0);
+
+  if (totalIssues === 0) {
+    log.success('All repos clean — good bots!');
+  } else {
+    log.warn(`${totalIssues} total issues across ${results.length} repos.`);
+  }
+}
+
+function generateMarkdownReport(results: RepoResult[]): string {
+  const avgScore = Math.round(
+    results.reduce((sum, r) => sum + r.analysis.health.score, 0) / results.length,
+  );
+
+  const lines: string[] = [];
+  lines.push('# Multi-Repo Health Report');
+  lines.push('');
+  lines.push(`> Generated by [goodbot](https://github.com/timeritual/goodbot-ai) on ${new Date().toLocaleDateString()}`);
+  lines.push('');
+  lines.push(`**Repos:** ${results.length} | **Average Score:** ${avgScore}/100`);
+  lines.push('');
+  lines.push('| Repo | Grade | Score | Circular | Layer | SOLID Errors |');
+  lines.push('|------|:-----:|:-----:|:--------:|:-----:|:------------:|');
+
+  for (const r of results.sort((a, b) => b.analysis.health.score - a.analysis.health.score)) {
+    const h = r.analysis.health;
+    const d = r.analysis.dependency;
+    const s = r.analysis.solid;
+    const emoji = h.grade.startsWith('A') ? '🟢' : h.grade.startsWith('B') ? '🔵' : h.grade.startsWith('C') ? '🟡' : '🔴';
+
+    lines.push(
+      `| ${r.name} | ${emoji} ${h.grade} | ${h.score} | ${d.circularDependencies.length} | ${d.layerViolations.length} | ${s.violations.filter((v) => v.severity === 'error').length} |`,
+    );
+  }
+
+  lines.push('');
+  lines.push('---');
+  lines.push('*Generated by [goodbot](https://github.com/timeritual/goodbot-ai)*');
+  lines.push('');
+
+  return lines.join('\n');
+}
+
+function gradeColor(grade: string): chalk.ChalkInstance {
+  if (grade.startsWith('A')) return chalk.green;
+  if (grade.startsWith('B')) return chalk.cyan;
+  if (grade.startsWith('C')) return chalk.yellow;
+  return chalk.red;
+}
+
+function colorCount(n: number): string {
+  return n === 0 ? chalk.green(String(n)) : chalk.red(String(n));
+}

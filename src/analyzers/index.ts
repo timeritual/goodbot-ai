@@ -16,6 +16,7 @@ import { findLayerViolations } from './layer-checker.js';
 import { runSolidAnalysis } from './solid.js';
 import { calculateHealthScore } from './health-score.js';
 import { loadIgnoreRules, filterSolidViolations, filterLayerViolations, filterBarrelViolations } from './ignore.js';
+import { checkCustomRules } from './custom-rules.js';
 
 export type { DependencyAnalysis, DependencyAnalysisSummary, FullAnalysis, SolidAnalysis, HealthScore } from './types.js';
 
@@ -231,6 +232,13 @@ export async function runFullAnalysis(
     allFileImports, sourceFiles, structure.detectedLayers,
     projectRoot, srcRootAbsolute, thresholds,
   );
+
+  // Custom rules
+  const customRules = (config as { customRulesConfig?: Array<{ name: string; pattern: string; description?: string; forbidden_in?: string[]; required_in?: string[]; max_imports?: number; severity?: 'info' | 'warning' | 'error' }> })?.customRulesConfig ?? [];
+  if (customRules.length > 0) {
+    const customViolations = checkCustomRules(allFileImports, customRules);
+    solid.violations.push(...customViolations);
+  }
 
   // Apply ignore rules
   const ignoreRules = await loadIgnoreRules(projectRoot);

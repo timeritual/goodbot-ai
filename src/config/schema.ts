@@ -50,6 +50,27 @@ export const GoodbotConfigSchema = z.object({
     importStyle: z.enum(['barrel', 'direct', 'mixed']).default('direct'),
     customRules: z.array(z.string()).default([]),
   }).default({}),
+  analysis: z.object({
+    solid: z.boolean().default(true),
+    thresholds: z.object({
+      maxFileLines: z.number().default(300),
+      maxBarrelExports: z.number().default(15),
+      maxModuleCoupling: z.number().default(8),
+    }).default({}),
+  }).default({}),
+  customRulesConfig: z.array(z.object({
+    name: z.string(),
+    description: z.string().optional(),
+    pattern: z.string(),
+    forbidden_in: z.array(z.string()).optional(),
+    required_in: z.array(z.string()).optional(),
+    max_imports: z.number().optional(),
+    severity: z.enum(['info', 'warning', 'error']).optional(),
+  })).default([]),
+  team: z.object({
+    syncUrl: z.string().optional(),
+    name: z.string().optional(),
+  }).default({}),
   ignore: z.object({
     paths: z.array(z.string()).default([
       'node_modules', 'dist', 'build', '.next', 'coverage', '*.lock',

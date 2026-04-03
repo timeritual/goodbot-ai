@@ -9,6 +9,11 @@ import { watchCommand } from './commands/watch.js';
 import { fixCommand } from './commands/fix.js';
 import { scoreCommand } from './commands/score.js';
 import { prCommand } from './commands/pr.js';
+import { ciCommand } from './commands/ci.js';
+import { trendCommand } from './commands/trend.js';
+import { syncCommand } from './commands/sync.js';
+import { reportCommand } from './commands/report.js';
+import { onboardCommand } from './commands/onboard.js';
 
 const program = new Command();
 
@@ -17,6 +22,7 @@ program
   .description('Auto-generate AI agent guardrail files for your project')
   .version('0.1.0');
 
+// Free tier
 program.addCommand(scanCommand);
 program.addCommand(initCommand);
 program.addCommand(generateCommand);
@@ -27,5 +33,12 @@ program.addCommand(watchCommand);
 program.addCommand(fixCommand);
 program.addCommand(scoreCommand);
 program.addCommand(prCommand);
+
+// Team tier
+program.addCommand(ciCommand);
+program.addCommand(trendCommand);
+program.addCommand(syncCommand);
+program.addCommand(reportCommand);
+program.addCommand(onboardCommand);
 
 program.parse();

@@ -529,18 +529,170 @@ goodbot auto-detects your stack and tailors the generated guidelines accordingly
 
 ---
 
+## Team Features
+
+### `goodbot ci` — GitHub Action PR Bot
+
+Run analysis in CI and output markdown for PR comments. Includes a reusable GitHub Action.
+
+```yaml
+# .github/workflows/goodbot.yml
+name: Architecture Analysis
+on: [pull_request]
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: timeritual/goodbot-ai@main
+        with:
+          mode: diff
+          comment: 'true'
+          fail-on-grade: C
+```
+
+Or use the CLI directly:
+
+```bash
+goodbot ci --output pr-comment.md --json result.json
+```
+
+The PR comment includes health grade with emoji bars, violation counts, and collapsible details — and updates itself on each push.
+
+### `goodbot trend` — Track Health Over Time
+
+Record snapshots and visualize architectural progress across sprints.
+
+```bash
+# Record current state
+goodbot trend --record
+
+# View history
+goodbot trend
+
+Architecture Health Trend
+──────────────────────────────────────────────────
+  Current          B+ (80/100)
+  First recorded   C+ (64/100)
+  Change           +16
+  Entries          12
+  Period           Jan 15, 2026 → Apr 3, 2026
+
+Latest vs Previous
+──────────────────────────────────────────────────
+  Dependencies     65 +5
+  Stability        100 ±0
+  SOLID            91 +3
+  Architecture     70 +2
+```
+
+Add `goodbot trend --record` to your CI pipeline to track every merge to main.
+
+### `goodbot sync` — Shared Team Config
+
+One team lead configures the rules. All repos inherit them.
+
+```bash
+# Push your config to a shared location
+goodbot sync --push --from /path/to/shared/config.json
+
+# Team members pull from the shared source
+goodbot sync --from https://raw.githubusercontent.com/org/config/main/.goodbot/config.json
+
+# Or set it in config once, then just run:
+goodbot sync
+```
+
+Merges team rules with local project identity — your project name and verification commands stay local, architecture rules come from the team.
+
+### `goodbot report` — Multi-Repo Dashboard
+
+CTO-level visibility across your entire org.
+
+```bash
+goodbot report ./app ./api ./shared-lib ./admin
+
+Multi-Repo Health Report
+──────────────────────────────────────────────────
+  Repos analyzed   4
+  Average score    74
+  Best             shared-lib — A (88)
+  Worst            admin — C+ (63)
+
+  Repo                     Grade    Score    Circular  Layer   SOLID
+  ──────────────────────────────────────────────────────────────────
+  shared-lib               A        88       0         0       0
+  app                      B+       80       2         1       5
+  api                      B        72       0         0       3
+  admin                    C+       63       1         3       8
+```
+
+```bash
+# Generate a markdown report
+goodbot report ./app ./api --output health-report.md
+```
+
+### `goodbot onboard` — New Developer Guide
+
+Generate a comprehensive onboarding doc from your architecture — saves hours per new hire.
+
+```bash
+goodbot onboard
+
+✓ Onboarding guide saved to ONBOARDING.md
+95 lines — ready for new team members.
+```
+
+The guide includes project overview, module descriptions, import conventions, business logic rules, verification commands, and current health status.
+
+### Custom Rules
+
+Define team-specific rules in `.goodbot/config.json`:
+
+```json
+{
+  "customRulesConfig": [
+    {
+      "name": "no-api-in-components",
+      "description": "Components must not import from api layer directly",
+      "pattern": "\\.\\./(api|services/.*Service)",
+      "forbidden_in": ["src/components/**"],
+      "severity": "error"
+    },
+    {
+      "name": "max-hook-deps",
+      "description": "Hooks should not import from more than 3 modules",
+      "pattern": "\\.\\./(.*)",
+      "forbidden_in": ["src/hooks/**"],
+      "max_imports": 3,
+      "severity": "warning"
+    }
+  ]
+}
+```
+
+Custom rules are checked during `goodbot analyze` and appear alongside SOLID violations.
+
+---
+
 ## CI Integration
 
 ```yaml
-# GitHub Actions
+# Simple — just check guardrail files
 - name: Check AI guardrails
   run: npx goodbot-ai check
 
-- name: Analyze changed files
-  run: npx goodbot-ai diff --base ${{ github.event.pull_request.base.ref }}
+# PR analysis with comment
+- uses: timeritual/goodbot-ai@main
+  with:
+    mode: diff
+    comment: 'true'
+    fail-on-grade: C
 
-- name: Full architecture analysis
-  run: npx goodbot-ai analyze --json > analysis.json
+# Record trend on merge to main
+- name: Record health trend
+  if: github.ref == 'refs/heads/main'
+  run: npx goodbot-ai trend --record
 ```
 
 All commands return exit code 1 on violations — fail the build and keep your AI agents honest.
@@ -548,6 +700,8 @@ All commands return exit code 1 on violations — fail the build and keep your A
 ---
 
 ## Command Reference
+
+### Free Tier
 
 | Command | Description |
 |---------|-------------|
@@ -561,6 +715,16 @@ All commands return exit code 1 on violations — fail the build and keep your A
 | `goodbot fix` | Auto-fix violations (missing barrels, split markers) |
 | `goodbot score` | One-line health grade (for scripts and git hooks) |
 | `goodbot pr` | Generate PR description with architectural impact |
+
+### Team Tier
+
+| Command | Description |
+|---------|-------------|
+| `goodbot ci` | CI/CD analysis with PR comment output |
+| `goodbot trend` | Track health score over time |
+| `goodbot sync` | Sync shared team config across repos |
+| `goodbot report` | Multi-repo health dashboard |
+| `goodbot onboard` | Generate new developer onboarding guide |
 
 ---
 

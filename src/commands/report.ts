@@ -93,7 +93,7 @@ function renderReport(results: RepoResult[]): void {
   log.table('Repos analyzed', String(results.length));
   log.table('Average score', String(avgScore));
   log.table('Best', `${bestRepo.name} — ${chalk.green(bestRepo.analysis.health.grade)} (${bestRepo.analysis.health.score})`);
-  log.table('Worst', `${worstRepo.name} — ${gradeColor(worstRepo.analysis.health.grade)(worstRepo.analysis.health.grade)} (${worstRepo.analysis.health.score})`);
+  log.table('Worst', `${worstRepo.name} — ${colorGrade(worstRepo.analysis.health.grade)} (${worstRepo.analysis.health.score})`);
 
   // Per-repo table
   console.log();
@@ -104,10 +104,9 @@ function renderReport(results: RepoResult[]): void {
     const h = r.analysis.health;
     const d = r.analysis.dependency;
     const s = r.analysis.solid;
-    const color = gradeColor(h.grade);
 
     console.log(
-      `  ${r.name.padEnd(24)} ${color(h.grade.padEnd(8))} ${String(h.score).padEnd(8)} ` +
+      `  ${r.name.padEnd(24)} ${colorGrade(h.grade).padEnd(8)} ${String(h.score).padEnd(8)} ` +
       `${colorCount(d.circularDependencies.length).padEnd(10)} ` +
       `${colorCount(d.layerViolations.length).padEnd(8)} ` +
       `${colorCount(s.violations.filter((v) => v.severity === 'error').length)}`,
@@ -161,11 +160,11 @@ function generateMarkdownReport(results: RepoResult[]): string {
   return lines.join('\n');
 }
 
-function gradeColor(grade: string): chalk.ChalkInstance {
-  if (grade.startsWith('A')) return chalk.green;
-  if (grade.startsWith('B')) return chalk.cyan;
-  if (grade.startsWith('C')) return chalk.yellow;
-  return chalk.red;
+function colorGrade(grade: string): string {
+  if (grade.startsWith('A')) return chalk.green(grade);
+  if (grade.startsWith('B')) return chalk.cyan(grade);
+  if (grade.startsWith('C')) return chalk.yellow(grade);
+  return chalk.red(grade);
 }
 
 function colorCount(n: number): string {

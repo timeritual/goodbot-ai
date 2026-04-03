@@ -21,7 +21,7 @@ export const watchCommand = new Command('watch')
       process.exit(1);
     }
 
-    let config;
+    let config: Awaited<ReturnType<typeof loadConfig>> | undefined;
     try { config = await loadConfig(projectRoot); } catch { /* no config */ }
 
     const srcPath = path.join(projectRoot, scan.structure.srcRoot);

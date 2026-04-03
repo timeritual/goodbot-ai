@@ -71,15 +71,15 @@ export const analyzeCommand = new Command('analyze')
 
 // ─── Health Grade ─────────────────────────────────────────
 
-function gradeColor(grade: string): chalk.ChalkInstance {
-  if (grade.startsWith('A')) return chalk.green;
-  if (grade.startsWith('B')) return chalk.cyan;
-  if (grade.startsWith('C')) return chalk.yellow;
-  return chalk.red;
+function colorGrade(grade: string): string {
+  const g = chalk.bold(` ${grade} `);
+  if (grade.startsWith('A')) return chalk.green(g);
+  if (grade.startsWith('B')) return chalk.cyan(g);
+  if (grade.startsWith('C')) return chalk.yellow(g);
+  return chalk.red(g);
 }
 
 export function renderHealthGrade(health: HealthScore): void {
-  const color = gradeColor(health.grade);
   const bar = (score: number) => {
     const filled = Math.round(score / 10);
     const empty = 10 - filled;
@@ -88,7 +88,7 @@ export function renderHealthGrade(health: HealthScore): void {
   };
 
   console.log();
-  console.log(`  ${chalk.bold('Health Grade:')} ${color.bold(` ${health.grade} `)} ${chalk.dim(`(${health.score}/100)`)}`);
+  console.log(`  ${chalk.bold('Health Grade:')} ${colorGrade(health.grade)} ${chalk.dim(`(${health.score}/100)`)}`);
   console.log();
   console.log(`  ${chalk.dim('Dependencies'.padEnd(16))} ${bar(health.breakdown.dependencies)} ${chalk.dim(String(health.breakdown.dependencies))}`);
   console.log(`  ${chalk.dim('Stability'.padEnd(16))} ${bar(health.breakdown.stability)} ${chalk.dim(String(health.breakdown.stability))}`);
@@ -240,11 +240,10 @@ function renderFinalSummary(result: FullAnalysis): void {
 // ─── Summary for scan --analyze ───────────────────────────
 
 export function renderFullAnalysisSummary(result: FullAnalysis): void {
-  const color = gradeColor(result.health.grade);
   const dep = result.dependency;
   const summary = summarizeAnalysis(dep);
 
-  log.header(`Architecture Health: ${color.bold(result.health.grade)} ${chalk.dim(`(${result.health.score}/100)`)}`);
+  log.header(`Architecture Health: ${colorGrade(result.health.grade)} ${chalk.dim(`(${result.health.score}/100)`)}`);
   console.log(chalk.dim('─'.repeat(50)));
   log.table('Modules', String(summary.moduleCount));
   log.table('Edges', String(summary.edgeCount));

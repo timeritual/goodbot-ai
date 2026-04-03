@@ -292,6 +292,12 @@ export const initCommand = new Command('init')
         importStyle: barrelImportRule === 'always' ? 'barrel' : barrelImportRule === 'recommended' ? 'barrel' : 'direct',
         customRules,
       },
+      analysis: {
+        solid: true,
+        thresholds: { maxFileLines: 300, maxBarrelExports: 15, maxModuleCoupling: 8 },
+      },
+      customRulesConfig: [],
+      team: {},
       ignore: {
         paths: defaults.ignorePaths,
         sensitiveFiles: ['.env', '.env.*', 'credentials.json', '*.pem', '*.key'],

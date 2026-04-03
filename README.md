@@ -158,7 +158,68 @@ Read-only analysis of your project. No files created, no config needed — just 
 ```bash
 goodbot scan
 goodbot scan --path /path/to/other/project
+goodbot scan --analyze    # Include dependency analysis summary
 ```
+
+### `goodbot analyze`
+
+Deep architectural analysis — the killer feature. Parses every import in your codebase, builds a dependency graph, and checks it against software architecture principles.
+
+```
+$ goodbot analyze
+
+✔ Analysis complete (158ms)
+
+Dependency Analysis
+──────────────────────────────────────────────────
+  Modules            14
+  Cross-module edges 52
+  Files parsed       193
+  Time               158ms
+
+Module Stability
+──────────────────────────────────────────────────
+  Module                 Ca   Ce  Instability
+  constants               5    0  0.00 ██████████
+  types                  11    0  0.00 ██████████
+  utils                   8    1  0.11 █████████░
+  config                  4    2  0.33 ███████░░░
+  api                     4    4  0.50 █████░░░░░
+  services                4    4  0.50 █████░░░░░
+  contexts                6    7  0.54 █████░░░░░
+  hooks                   2    4  0.67 ███░░░░░░░
+  components              2    8  0.80 ██░░░░░░░░
+  screens                 1   11  0.92 █░░░░░░░░░
+  navigation              0    4  1.00 ░░░░░░░░░░
+
+Circular Dependencies (2)
+──────────────────────────────────────────────────
+  ⚠ debug → contexts → debug
+    src/debug/useDebugCanvas.ts:2 → ../contexts
+    src/contexts/SketchContext.tsx:27 → ../debug
+
+Layer Violations (1)
+──────────────────────────────────────────────────
+  ✗ debug (L5) → contexts (L6)
+    src/debug/useDebugCanvas.ts:2 → ../contexts
+
+⚠ 3 total issues found.
+```
+
+**What it checks:**
+
+| Analysis | What it does |
+|----------|-------------|
+| **Stability Metrics** | Calculates afferent coupling (Ca), efferent coupling (Ce), and instability (I = Ce/(Ca+Ce)) per module |
+| **Stable Dependency Principle** | Flags when a stable module depends on a less stable one — dependencies should flow toward stability |
+| **Circular Dependencies** | Finds cycles using Tarjan's strongly connected components algorithm |
+| **Layer Violations** | Validates imports flow downward only through your declared architecture layers |
+| **Barrel Violations** | Detects imports that bypass barrel files (e.g., `../services/orderService` instead of `../services`) |
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output full analysis as JSON for programmatic consumption |
+| `--path <path>` | Analyze a specific project directory |
 
 ---
 

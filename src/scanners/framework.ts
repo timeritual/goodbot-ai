@@ -16,6 +16,7 @@ export async function detectFramework(projectRoot: string): Promise<FrameworkDet
     const checks: Array<{ key: string; framework: Framework }> = [
       { key: 'react-native', framework: 'react-native' },
       { key: 'next', framework: 'next' },
+      { key: '@angular/core', framework: 'angular' },
       { key: '@nestjs/core', framework: 'nest' },
       { key: 'express', framework: 'express' },
       { key: 'react', framework: 'react' },

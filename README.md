@@ -516,6 +516,7 @@ goodbot auto-detects your stack and tailors the generated guidelines accordingly
 
 | Framework | Detection | Red flags included |
 |-----------|-----------|-------------------|
+| Angular | `package.json → @angular/core` | Logic in components, direct HTTP in components, missing DI |
 | React | `package.json → react` | Business logic in components, fetch in useEffect |
 | React Native | `package.json → react-native` | AsyncStorage misuse, fetch in screens |
 | Next.js | `package.json → next` | Secrets in client code, missing caching |

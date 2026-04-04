@@ -2,6 +2,7 @@ export type Framework =
   | 'react'
   | 'react-native'
   | 'next'
+  | 'angular'
   | 'node'
   | 'express'
   | 'nest'

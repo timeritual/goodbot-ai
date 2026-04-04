@@ -61,6 +61,18 @@ export const frameworkDefaults: Record<Framework, FrameworkDefaults> = {
     businessLogicForbidden: ['routes', 'middleware'],
     ignorePaths: [...BASE_IGNORE, '.env', '.env.*'],
   },
+  angular: {
+    redFlags: [
+      'Business logic in components — move to services',
+      'Direct HTTP calls in components — use services with HttpClient',
+      'State management without services or NgRx',
+      'Missing dependency injection — use constructor injection',
+      'DOM manipulation outside directives',
+    ],
+    businessLogicIn: ['services'],
+    businessLogicForbidden: ['components', 'pipes', 'directives'],
+    ignorePaths: [...BASE_IGNORE, '.angular', '.env', '.env.*'],
+  },
   nest: {
     redFlags: [
       'Business logic in controllers',

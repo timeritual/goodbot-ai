@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { FileImports, BarrelViolation } from './types.js';
-import type { DetectedLayer } from '../scanners/types.js';
+import type { DetectedLayer } from '../scanners/index.js';
 
 /**
  * Find imports that bypass barrel files (index.ts).

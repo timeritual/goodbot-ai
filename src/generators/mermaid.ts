@@ -1,4 +1,4 @@
-import type { DependencyAnalysis } from '../analyzers/types.js';
+import type { DependencyAnalysis } from '../analyzers/index.js';
 
 /**
  * Generate a mermaid dependency diagram from analysis results.

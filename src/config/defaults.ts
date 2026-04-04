@@ -1,4 +1,4 @@
-import type { Framework } from '../scanners/types.js';
+import type { Framework } from '../scanners/index.js';
 
 interface FrameworkDefaults {
   redFlags: string[];

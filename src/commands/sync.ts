@@ -2,9 +2,8 @@ import { Command } from 'commander';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import ora from 'ora';
-import { loadConfig, saveConfig, configPath } from '../config/index.js';
+import { loadConfig, saveConfig, configPath, type GoodbotConfig } from '../config/index.js';
 import { log, safeReadFile, safeReadJson, safeWriteFile } from '../utils/index.js';
-import type { GoodbotConfig } from '../config/schema.js';
 
 export const syncCommand = new Command('sync')
   .description('Sync team config from a shared source (URL or git repo)')

@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { StructureAnalysis, DetectedLayer } from '../scanners/types.js';
+import type { StructureAnalysis, DetectedLayer } from '../scanners/index.js';
 import type { GoodbotConfig } from '../config/index.js';
 import type {
   DependencyAnalysis, DependencyAnalysisSummary, FileImports,
@@ -18,7 +18,7 @@ import { calculateHealthScore } from './health-score.js';
 import { loadIgnoreRules, filterSolidViolations, filterLayerViolations, filterBarrelViolations } from './ignore.js';
 import { checkCustomRules } from './custom-rules.js';
 
-export type { DependencyAnalysis, DependencyAnalysisSummary, FullAnalysis, SolidAnalysis, HealthScore } from './types.js';
+export type { DependencyAnalysis, DependencyAnalysisSummary, FullAnalysis, SolidAnalysis, HealthScore, HealthGrade } from './types.js';
 
 const BATCH_SIZE = 50;
 

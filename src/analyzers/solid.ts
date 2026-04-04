@@ -7,7 +7,7 @@ import type {
   DEFAULT_THRESHOLDS,
 } from './types.js';
 import { DEFAULT_THRESHOLDS as DEFAULTS } from './types.js';
-import type { DetectedLayer } from '../scanners/types.js';
+import type { DetectedLayer } from '../scanners/index.js';
 import { checkSRP } from './srp-checker.js';
 import { checkDIP } from './dip-checker.js';
 import { checkISP } from './isp-checker.js';

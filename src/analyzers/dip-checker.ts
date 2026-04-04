@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { FileImports, SolidViolation } from './types.js';
-import type { DetectedLayer } from '../scanners/types.js';
+import type { DetectedLayer } from '../scanners/index.js';
 
 /**
  * Dependency Inversion Principle checker.

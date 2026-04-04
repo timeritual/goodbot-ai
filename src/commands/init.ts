@@ -6,11 +6,13 @@ import {
   saveConfig,
   configExists,
   frameworkDefaults,
+  buildPresetConfig,
+  PRESET_DESCRIPTIONS,
   type GoodbotConfig,
+  type PresetName,
 } from '../config/index.js';
-import { buildPresetConfig, PRESET_DESCRIPTIONS, type PresetName } from '../config/presets.js';
 import { log } from '../utils/index.js';
-import type { Framework, Language } from '../scanners/types.js';
+import type { Framework, Language } from '../scanners/index.js';
 
 const FRAMEWORKS: Framework[] = [
   'react', 'react-native', 'next', 'node', 'express', 'nest',

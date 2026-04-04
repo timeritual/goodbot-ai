@@ -4,11 +4,10 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { runFullScan } from '../scanners/index.js';
 import { runFullAnalysis } from '../analyzers/index.js';
-import { loadConfig } from '../config/index.js';
+import { loadConfig, type GoodbotConfig } from '../config/index.js';
 import { log, safeWriteFile } from '../utils/index.js';
-import type { FullAnalysis } from '../analyzers/types.js';
-import type { ScanResult } from '../scanners/types.js';
-import type { GoodbotConfig } from '../config/schema.js';
+import type { FullAnalysis } from '../analyzers/index.js';
+import type { ScanResult } from '../scanners/index.js';
 
 export const onboardCommand = new Command('onboard')
   .description('Generate a new developer onboarding guide for your project')

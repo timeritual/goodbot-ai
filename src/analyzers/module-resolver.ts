@@ -31,7 +31,16 @@ export async function resolveImportPath(
   specifier: string,
   fromDir: string,
 ): Promise<string | null> {
-  const base = path.resolve(fromDir, specifier);
+  let base = path.resolve(fromDir, specifier);
+
+  // Handle ESM .js extension convention: import from './foo.js' → actual file is foo.ts
+  if (base.endsWith('.js') || base.endsWith('.jsx')) {
+    const tsVariant = base.replace(/\.js(x?)$/, '.ts$1');
+    if (await fileExists(tsVariant)) return tsVariant;
+    // Also try .tsx for .js imports
+    const tsxVariant = base.replace(/\.js$/, '.tsx');
+    if (await fileExists(tsxVariant)) return tsxVariant;
+  }
 
   // Try exact path first (must be a file, not directory)
   try {
@@ -40,6 +49,9 @@ export async function resolveImportPath(
   } catch {
     // doesn't exist, continue
   }
+
+  // Strip .js/.jsx extension before trying other extensions
+  base = base.replace(/\.(js|jsx)$/, '');
 
   // Try with extensions
   for (const ext of SOURCE_EXTENSIONS) {

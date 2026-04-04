@@ -6,7 +6,7 @@ import { runFullScan } from '../scanners/index.js';
 import { runFullAnalysis, summarizeAnalysis } from '../analyzers/index.js';
 import { loadConfig } from '../config/index.js';
 import { log, safeWriteFile } from '../utils/index.js';
-import type { FullAnalysis, HealthGrade } from '../analyzers/types.js';
+import type { FullAnalysis, HealthGrade } from '../analyzers/index.js';
 
 const GRADE_ORDER: HealthGrade[] = ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F'];
 

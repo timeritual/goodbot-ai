@@ -6,7 +6,7 @@ import { runFullScan } from '../scanners/index.js';
 import { runFullAnalysis } from '../analyzers/index.js';
 import { loadConfig } from '../config/index.js';
 import { log, safeReadJson, safeWriteJson } from '../utils/index.js';
-import type { HealthGrade } from '../analyzers/types.js';
+import type { HealthGrade } from '../analyzers/index.js';
 
 interface TrendEntry {
   date: string;

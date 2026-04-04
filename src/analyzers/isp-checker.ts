@@ -2,7 +2,7 @@ import { createReadStream } from 'node:fs';
 import { createInterface } from 'node:readline';
 import path from 'node:path';
 import type { SolidViolation, AnalysisThresholds } from './types.js';
-import type { DetectedLayer } from '../scanners/types.js';
+import type { DetectedLayer } from '../scanners/index.js';
 
 /**
  * Interface Segregation Principle checker.

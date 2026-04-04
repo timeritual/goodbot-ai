@@ -7,7 +7,7 @@ import { runFullAnalysis } from '../analyzers/index.js';
 import { loadConfig } from '../config/index.js';
 import { log } from '../utils/index.js';
 import { renderHealthGrade } from './analyze.js';
-import type { FullAnalysis } from '../analyzers/types.js';
+import type { FullAnalysis } from '../analyzers/index.js';
 
 export const diffCommand = new Command('diff')
   .description('Analyze only changed files — shows new/resolved violations vs base branch')

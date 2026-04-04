@@ -1,0 +1,4 @@
+# Config layer imports Framework type from scanners — intentional design choice.
+# Config needs to know about frameworks to provide per-framework defaults.
+src/config/defaults.ts LAYER
+src/config/presets.ts LAYER

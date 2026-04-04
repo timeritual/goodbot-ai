@@ -1,5 +1,5 @@
 import type { GoodbotConfig } from './schema.js';
-import type { ScanResult } from '../scanners/types.js';
+import type { ScanResult } from '../scanners/index.js';
 import { frameworkDefaults } from './defaults.js';
 
 export type PresetName = 'strict' | 'recommended' | 'relaxed';

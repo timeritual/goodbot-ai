@@ -1,5 +1,5 @@
 import type { GoodbotConfig } from '../config/index.js';
-import type { DependencyAnalysisSummary } from '../analyzers/types.js';
+import type { DependencyAnalysisSummary } from '../analyzers/index.js';
 import type { GeneratorContext } from './types.js';
 
 function buildLayerDiagram(

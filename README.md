@@ -162,13 +162,20 @@ $ goodbot check
 
 ### `goodbot scan`
 
-Read-only analysis of your project. No files created, no config needed — just run it and see what goodbot detects.
+Lightweight reconnaissance — detects your framework, languages, project structure, architectural layers, and verification commands. No files created, no config needed. Use this to see what goodbot sees before committing to anything.
 
 ```bash
-goodbot scan
-goodbot scan --path /path/to/other/project
-goodbot scan --analyze    # Include health grade + architecture summary
+goodbot scan                        # Quick project overview
+goodbot scan --path /other/project  # Scan a different directory
+goodbot scan --analyze              # Include a condensed health summary
 ```
+
+| Flag | Description |
+|------|-------------|
+| `-p, --path <path>` | Project path to scan (default: current directory) |
+| `-a, --analyze` | Append a condensed health grade + architecture summary |
+
+**`scan` vs `analyze` vs `scan --analyze`** — `scan` gives you a fast, read-only snapshot of your project's structure. `analyze` runs a full architectural audit (dependency graph, SOLID checks, health grade). `scan --analyze` is a middle ground: it runs the scan first, then appends a condensed analysis summary with just the key numbers — health grade, module count, circular deps, layer violations, and SOLID score — and suggests running `goodbot analyze` for the full breakdown.
 
 ### `goodbot analyze`
 
@@ -709,8 +716,9 @@ All commands return exit code 1 on violations — fail the build and keep your A
 | `goodbot init` | Interactive project setup (or `--preset strict\|recommended\|relaxed`) |
 | `goodbot generate` | Generate AI agent guardrail files |
 | `goodbot check` | Detect drift in generated files |
-| `goodbot scan` | Read-only project analysis |
-| `goodbot analyze` | Deep architecture + SOLID analysis with health grade |
+| `goodbot scan` | Quick project structure detection (framework, layers, commands) |
+| `goodbot scan --analyze` | Scan + condensed health grade and architecture summary |
+| `goodbot analyze` | Full architecture + SOLID analysis with detailed health grade |
 | `goodbot diff` | Analyze only changed files vs base branch |
 | `goodbot watch` | Continuous live monitoring dashboard |
 | `goodbot fix` | Auto-fix violations (missing barrels, split markers) |

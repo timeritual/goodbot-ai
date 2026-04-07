@@ -5,8 +5,8 @@ import chalk from 'chalk';
 import { loadConfig, saveChecksums } from '../config/index.js';
 import { generateAll } from '../generators/index.js';
 import { runFullScan } from '../scanners/index.js';
-import { runFullAnalysis } from '../analyzers/index.js';
-import type { FullAnalysis } from '../analyzers/index.js';
+import { runFullAnalysis, analyzeGitHistory, findTemporalCoupling } from '../analyzers/index.js';
+import type { FullAnalysis, GitHistoryAnalysis, TemporalCoupling } from '../analyzers/index.js';
 import { log, safeWriteFile, safeReadFile, contentHash } from '../utils/index.js';
 
 export const generateCommand = new Command('generate')
@@ -27,14 +27,20 @@ export const generateCommand = new Command('generate')
     }
 
     let fullAnalysis: FullAnalysis | undefined;
+    let gitHistory: GitHistoryAnalysis | undefined;
+    let temporalCouplings: TemporalCoupling[] | undefined;
 
     if (opts.analyze) {
       const analyzeSpinner = ora('Analyzing project for adaptive guardrails...').start();
       try {
         const scan = await runFullScan(projectRoot);
         fullAnalysis = await runFullAnalysis(projectRoot, scan.structure, config);
+        analyzeSpinner.text = 'Analyzing git history...';
+        gitHistory = await analyzeGitHistory(projectRoot, 500, scan.structure.srcRoot ?? undefined);
+        temporalCouplings = findTemporalCoupling(gitHistory.commits, 3, 0.5, scan.structure.srcRoot ?? undefined);
+        const aiPct = Math.round(gitHistory.aiCommitRatio * 100);
         analyzeSpinner.succeed(
-          `Analysis complete — ${fullAnalysis.health.grade} (${fullAnalysis.health.score}/100)`,
+          `Analysis complete — ${fullAnalysis.health.grade} (${fullAnalysis.health.score}/100), ${gitHistory.totalCommits} commits (${aiPct}% AI)`,
         );
       } catch (err) {
         analyzeSpinner.warn('Analysis failed, generating without analysis data');
@@ -44,7 +50,7 @@ export const generateCommand = new Command('generate')
     const spinner = ora('Generating files...').start();
 
     try {
-      const files = await generateAll(config, fullAnalysis);
+      const files = await generateAll(config, fullAnalysis, gitHistory, temporalCouplings);
       spinner.succeed(`Generated ${files.length} files`);
 
       const checksums: Record<string, string> = {};

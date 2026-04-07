@@ -79,6 +79,10 @@ export interface AnalysisInsights {
   oversizedFiles: string[];
   highComplexityFiles: string[];
   deadExportModules: Array<{ module: string; exports: string[] }>;
+  // Git history insights
+  hotspotFiles: string[];
+  aiCommitRatio: number;         // 0-100 percentage
+  temporalCouplings: Array<{ fileA: string; fileB: string; strength: number }>;
   // Flags for conditional template sections
   hasCircularDeps: boolean;
   hasBarrelViolations: boolean;
@@ -89,6 +93,9 @@ export interface AnalysisInsights {
   hasDeadExports: boolean;
   hasShallowModules: boolean;
   hasGodModules: boolean;
+  hasHotspots: boolean;
+  hasTemporalCoupling: boolean;
+  hasHighAIRatio: boolean;
 }
 
 export interface GeneratedFile {

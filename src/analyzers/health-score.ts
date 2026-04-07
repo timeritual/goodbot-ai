@@ -31,18 +31,21 @@ export function calculateHealthScore(
   if (dep.modules.length > 0) architecture += 15;
   if (dep.modules.length >= 4) architecture += 15;
   if (dep.modules.length >= 8) architecture += 10;
-  // Reward low coupling
-  const avgCoupling = dep.edges.length / Math.max(dep.modules.length, 1);
-  if (avgCoupling <= 2) architecture += 30;
-  else if (avgCoupling <= 3) architecture += 20;
-  else if (avgCoupling <= 5) architecture += 10;
-  // Reward having barrel files (encapsulation)
-  if (dep.modules.length > 0 && dep.barrelViolations.length === 0) architecture += 15;
-  // Reward low god-module ratio (no single module dominates)
-  const maxFanOut = Math.max(...dep.modules.map(m => m.dependsOn.size), 0);
-  const maxFanIn = Math.max(...dep.modules.map(m => m.dependedOnBy.size), 0);
-  if (maxFanOut <= 3 && maxFanIn <= 3) architecture += 15;
-  else if (maxFanOut <= 5 && maxFanIn <= 5) architecture += 10;
+  // Remaining checks only apply when modules exist
+  if (dep.modules.length > 0) {
+    // Reward low coupling
+    const avgCoupling = dep.edges.length / dep.modules.length;
+    if (avgCoupling <= 2) architecture += 30;
+    else if (avgCoupling <= 3) architecture += 20;
+    else if (avgCoupling <= 5) architecture += 10;
+    // Reward having barrel files (encapsulation)
+    if (dep.barrelViolations.length === 0) architecture += 15;
+    // Reward low god-module ratio (no single module dominates)
+    const maxFanOut = Math.max(...dep.modules.map(m => m.dependsOn.size));
+    const maxFanIn = Math.max(...dep.modules.map(m => m.dependedOnBy.size));
+    if (maxFanOut <= 3 && maxFanIn <= 3) architecture += 15;
+    else if (maxFanOut <= 5 && maxFanIn <= 5) architecture += 10;
+  }
   // Cap at 100
   architecture = Math.min(100, architecture);
   // Penalize layer violations

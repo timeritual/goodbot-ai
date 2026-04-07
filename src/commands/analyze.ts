@@ -197,7 +197,7 @@ export function renderSolidAnalysis(solid: SolidAnalysis): void {
     const warnings = solid.violations.filter((v) => v.severity === 'warning');
 
     if (errors.length > 0) {
-      for (const v of errors.slice(0, 5)) {
+      for (const v of errors.slice(0, 8)) {
         console.log(`  ${chalk.red('✗')} ${chalk.red(`[${v.principle}]`)} ${v.message}`);
         console.log(chalk.dim(`    ${v.file}`));
         console.log(chalk.green(`    → ${v.suggestion}`));
@@ -205,13 +205,13 @@ export function renderSolidAnalysis(solid: SolidAnalysis): void {
     }
 
     if (warnings.length > 0) {
-      for (const v of warnings.slice(0, 10)) {
+      for (const v of warnings.slice(0, 15)) {
         console.log(`  ${chalk.yellow('⚠')} ${chalk.yellow(`[${v.principle}]`)} ${v.message}`);
         console.log(chalk.dim(`    ${v.file}`));
       }
     }
 
-    const remaining = solid.violations.length - Math.min(errors.length, 5) - Math.min(warnings.length, 10);
+    const remaining = solid.violations.length - Math.min(errors.length, 8) - Math.min(warnings.length, 15);
     if (remaining > 0) {
       log.dim(`  ... and ${remaining} more`);
     }
@@ -227,7 +227,7 @@ function renderFinalSummary(result: FullAnalysis): void {
     dep.layerViolations.length +
     dep.barrelViolations.length +
     dep.stabilityViolations.length +
-    result.solid.violations.filter((v) => v.severity === 'error').length;
+    result.solid.violations.filter((v) => v.severity === 'error' || v.severity === 'warning').length;
 
   console.log();
   if (totalIssues === 0) {

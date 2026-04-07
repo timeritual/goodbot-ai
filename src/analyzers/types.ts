@@ -120,12 +120,16 @@ export interface AnalysisThresholds {
   maxFileLines: number;
   maxBarrelExports: number;
   maxModuleCoupling: number;
+  maxFileComplexity?: number;       // cyclomatic complexity per file (default 20)
+  maxComplexityDensity?: number;    // complexity per 100 lines (default 15)
 }
 
 export const DEFAULT_THRESHOLDS: AnalysisThresholds = {
-  maxFileLines: 300,
-  maxBarrelExports: 15,
-  maxModuleCoupling: 8,
+  maxFileLines: 200,
+  maxBarrelExports: 10,
+  maxModuleCoupling: 6,
+  maxFileComplexity: 25,
+  maxComplexityDensity: 20,
 };
 
 // ─── Health Score ─────────────────────────────────────────

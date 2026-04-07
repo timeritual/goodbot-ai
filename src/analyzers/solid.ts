@@ -1,5 +1,6 @@
 import type {
   FileImports,
+  ModuleNode,
   SolidAnalysis,
   SolidScores,
   SolidViolation,
@@ -11,6 +12,8 @@ import type { DetectedLayer } from '../scanners/index.js';
 import { checkSRP } from './srp-checker.js';
 import { checkDIP } from './dip-checker.js';
 import { checkISP } from './isp-checker.js';
+import { checkComplexity } from './complexity-checker.js';
+import { checkGodModules } from './god-module-checker.js';
 
 export async function runSolidAnalysis(
   fileImports: FileImports[],
@@ -19,17 +22,23 @@ export async function runSolidAnalysis(
   projectRoot: string,
   srcRootAbsolute: string,
   thresholds: AnalysisThresholds = DEFAULTS,
+  modules: ModuleNode[] = [],
 ): Promise<SolidAnalysis> {
-  const [srpViolations, dipViolations, ispViolations] = await Promise.all([
+  const [srpViolations, dipViolations, ispViolations, complexityResult] = await Promise.all([
     checkSRP(fileImports, sourceFiles, projectRoot, thresholds),
     Promise.resolve(checkDIP(fileImports, detectedLayers, srcRootAbsolute)),
     checkISP(detectedLayers, srcRootAbsolute, thresholds),
+    checkComplexity(sourceFiles, projectRoot, thresholds),
   ]);
+
+  const godModuleResult = checkGodModules(modules, thresholds);
 
   const violations: SolidViolation[] = [
     ...srpViolations,
     ...dipViolations,
     ...ispViolations,
+    ...complexityResult.violations,
+    ...godModuleResult.violations,
   ];
 
   const scores = calculateScores(violations, sourceFiles.length);
@@ -49,8 +58,12 @@ function calculateScores(violations: SolidViolation[], totalFiles: number): Soli
     const warnings = v.filter((x) => x.severity === 'warning').length;
     const infos = v.filter((x) => x.severity === 'info').length;
 
-    // Deduct points per violation relative to project size
-    const penalty = (errors * 10 + warnings * 5 + infos * 1) / Math.max(totalFiles / 10, 1);
+    // Mild normalization using sqrt so large projects aren't punished for
+    // raw count alone, but can't hide behind thousands of clean files either.
+    // A 100-file project divides by ~3.2, a 1000-file project by ~10
+    const rawPenalty = errors * 10 + warnings * 5 + infos * 1;
+    const normalizer = Math.max(Math.sqrt(totalFiles / 10), 1);
+    const penalty = rawPenalty / normalizer;
     return Math.max(0, Math.round(100 - penalty));
   };
 

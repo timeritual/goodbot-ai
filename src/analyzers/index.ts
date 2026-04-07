@@ -19,6 +19,8 @@ import { loadIgnoreRules, filterSolidViolations, filterLayerViolations, filterBa
 import { checkCustomRules } from './custom-rules.js';
 
 export type { DependencyAnalysis, DependencyAnalysisSummary, FullAnalysis, SolidAnalysis, HealthScore, HealthGrade } from './types.js';
+export { analyzeGitHistory, type GitHistoryAnalysis, type FileHotspot, type GitCommit } from './git-history.js';
+export { findTemporalCoupling, type TemporalCoupling } from './temporal-coupling.js';
 
 const BATCH_SIZE = 50;
 

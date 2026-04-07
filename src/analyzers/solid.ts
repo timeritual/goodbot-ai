@@ -16,6 +16,8 @@ import { checkComplexity } from './complexity-checker.js';
 import { checkGodModules } from './god-module-checker.js';
 import { checkShallowModules } from './shallow-module-checker.js';
 import { checkPassthroughMethods } from './passthrough-checker.js';
+import { checkDeadExports } from './dead-export-checker.js';
+import { checkDuplication } from './duplication-checker.js';
 
 export async function runSolidAnalysis(
   fileImports: FileImports[],
@@ -26,13 +28,15 @@ export async function runSolidAnalysis(
   thresholds: AnalysisThresholds = DEFAULTS,
   modules: ModuleNode[] = [],
 ): Promise<SolidAnalysis> {
-  const [srpViolations, dipViolations, ispViolations, complexityResult, shallowResult, passthroughResult] = await Promise.all([
+  const [srpViolations, dipViolations, ispViolations, complexityResult, shallowResult, passthroughResult, deadExportResult, duplicationResult] = await Promise.all([
     checkSRP(fileImports, sourceFiles, projectRoot, thresholds),
     Promise.resolve(checkDIP(fileImports, detectedLayers, srcRootAbsolute)),
     checkISP(detectedLayers, srcRootAbsolute, thresholds),
     checkComplexity(sourceFiles, projectRoot, thresholds),
     checkShallowModules(modules, detectedLayers, sourceFiles, srcRootAbsolute, thresholds),
     checkPassthroughMethods(sourceFiles, projectRoot),
+    checkDeadExports(sourceFiles, detectedLayers, srcRootAbsolute, projectRoot),
+    checkDuplication(sourceFiles, projectRoot),
   ]);
 
   const godModuleResult = checkGodModules(modules, thresholds);
@@ -45,6 +49,8 @@ export async function runSolidAnalysis(
     ...godModuleResult.violations,
     ...shallowResult.violations,
     ...passthroughResult.violations,
+    ...deadExportResult.violations,
+    ...duplicationResult.violations,
   ];
 
   const scores = calculateScores(violations, sourceFiles.length);

@@ -4,6 +4,9 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { loadConfig, saveChecksums } from '../config/index.js';
 import { generateAll } from '../generators/index.js';
+import { runFullScan } from '../scanners/index.js';
+import { runFullAnalysis } from '../analyzers/index.js';
+import type { FullAnalysis } from '../analyzers/index.js';
 import { log, safeWriteFile, safeReadFile, contentHash } from '../utils/index.js';
 
 export const generateCommand = new Command('generate')
@@ -11,6 +14,7 @@ export const generateCommand = new Command('generate')
   .option('-p, --path <path>', 'Project path', process.cwd())
   .option('--force', 'Overwrite existing files without prompting', false)
   .option('--dry-run', 'Show what would be generated without writing', false)
+  .option('--analyze', 'Run analysis first and generate adaptive guardrails based on findings', false)
   .action(async (opts) => {
     const projectRoot = opts.path;
 
@@ -22,10 +26,25 @@ export const generateCommand = new Command('generate')
       process.exit(1);
     }
 
+    let fullAnalysis: FullAnalysis | undefined;
+
+    if (opts.analyze) {
+      const analyzeSpinner = ora('Analyzing project for adaptive guardrails...').start();
+      try {
+        const scan = await runFullScan(projectRoot);
+        fullAnalysis = await runFullAnalysis(projectRoot, scan.structure, config);
+        analyzeSpinner.succeed(
+          `Analysis complete — ${fullAnalysis.health.grade} (${fullAnalysis.health.score}/100)`,
+        );
+      } catch (err) {
+        analyzeSpinner.warn('Analysis failed, generating without analysis data');
+      }
+    }
+
     const spinner = ora('Generating files...').start();
 
     try {
-      const files = await generateAll(config);
+      const files = await generateAll(config, fullAnalysis);
       spinner.succeed(`Generated ${files.length} files`);
 
       const checksums: Record<string, string> = {};

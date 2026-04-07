@@ -1,6 +1,6 @@
 import type { GoodbotConfig } from '../config/index.js';
-import type { DependencyAnalysisSummary } from '../analyzers/index.js';
-import type { GeneratorContext } from './types.js';
+import type { DependencyAnalysisSummary, FullAnalysis } from '../analyzers/index.js';
+import type { GeneratorContext, AnalysisInsights } from './types.js';
 
 function buildLayerDiagram(
   layers: GoodbotConfig['architecture']['layers'],
@@ -24,7 +24,7 @@ function buildLayerDiagram(
   return lines.join('\n');
 }
 
-export function buildContext(config: GoodbotConfig, analysisSummary?: DependencyAnalysisSummary): GeneratorContext {
+export function buildContext(config: GoodbotConfig, analysisSummary?: DependencyAnalysisSummary, fullAnalysis?: FullAnalysis): GeneratorContext {
   const { project, architecture, businessLogic, verification, conventions, ignore } = config;
 
   const verificationCommands: Array<{ name: string; command: string }> = [];
@@ -66,5 +66,62 @@ export function buildContext(config: GoodbotConfig, analysisSummary?: Dependency
       topViolations: analysisSummary.topViolations,
     } : undefined,
     hasAnalysis: !!analysisSummary,
+    analysisInsights: fullAnalysis ? buildAnalysisInsights(fullAnalysis) : undefined,
+  };
+}
+
+function buildAnalysisInsights(analysis: FullAnalysis): AnalysisInsights {
+  const { dependency: dep, solid, health } = analysis;
+
+  const srpViolations = solid.violations.filter(v => v.principle === 'SRP');
+  const complexityViolations = srpViolations.filter(v => v.message.includes('complexity') || v.message.includes('Complexity'));
+  const duplicationViolations = srpViolations.filter(v => v.message.includes('duplicat'));
+  const deadExportViolations = solid.violations.filter(v => v.message.includes('Dead export'));
+  const shallowViolations = solid.violations.filter(v => v.message.includes('Shallow module'));
+  const godViolations = solid.violations.filter(v => v.message.includes('God module'));
+  const oversizedViolations = srpViolations.filter(v => v.message.includes('lines (threshold'));
+
+  // Extract dead export details
+  const deadExportModules: AnalysisInsights['deadExportModules'] = [];
+  for (const v of deadExportViolations) {
+    const match = v.message.match(/Dead exports in (\w+): (.+) \(/);
+    if (match) {
+      deadExportModules.push({
+        module: match[1],
+        exports: match[2].split(', ').slice(0, 8),
+      });
+    }
+  }
+
+  return {
+    healthGrade: health.grade,
+    healthScore: health.score,
+    circularDeps: dep.circularDependencies.length,
+    barrelViolations: dep.barrelViolations.length,
+    layerViolations: dep.layerViolations.length,
+    srpViolations: srpViolations.length,
+    complexityViolations: complexityViolations.length,
+    duplicationClusters: duplicationViolations.length,
+    deadExportCount: deadExportViolations.length,
+    shallowModules: shallowViolations.map(v => {
+      const match = v.message.match(/Shallow module: (\w+)/);
+      return match ? match[1] : v.file;
+    }),
+    godModules: godViolations.map(v => {
+      const match = v.message.match(/God module: (\w+)/);
+      return match ? match[1] : v.file;
+    }),
+    oversizedFiles: [...new Set(oversizedViolations.map(v => v.file))].slice(0, 10),
+    highComplexityFiles: [...new Set(complexityViolations.map(v => v.file))].slice(0, 10),
+    deadExportModules,
+    hasCircularDeps: dep.circularDependencies.length > 0,
+    hasBarrelViolations: dep.barrelViolations.length > 0,
+    hasLayerViolations: dep.layerViolations.length > 0,
+    hasSrpIssues: srpViolations.length > 0,
+    hasComplexity: complexityViolations.length > 0,
+    hasDuplication: duplicationViolations.length > 0,
+    hasDeadExports: deadExportViolations.length > 0,
+    hasShallowModules: shallowViolations.length > 0,
+    hasGodModules: godViolations.length > 0,
   };
 }

@@ -1,9 +1,10 @@
 import type { GoodbotConfig } from '../config/index.js';
+import type { FullAnalysis } from '../analyzers/index.js';
 import { buildContext } from './context-builder.js';
 import { renderTemplate } from './template-engine.js';
 import type { GeneratedFile } from './types.js';
 
-export type { GeneratorContext, GeneratedFile } from './types.js';
+export type { GeneratorContext, GeneratedFile, AnalysisInsights } from './types.js';
 export { buildContext } from './context-builder.js';
 export { renderTemplate } from './template-engine.js';
 export { generateArchitectureMd } from './mermaid.js';
@@ -24,8 +25,8 @@ const FILE_MAP: Array<{
 
 export { FILE_MAP };
 
-export async function generateAll(config: GoodbotConfig): Promise<GeneratedFile[]> {
-  const context = buildContext(config);
+export async function generateAll(config: GoodbotConfig, fullAnalysis?: FullAnalysis): Promise<GeneratedFile[]> {
+  const context = buildContext(config, undefined, fullAnalysis);
   const files: GeneratedFile[] = [];
 
   for (const entry of FILE_MAP) {

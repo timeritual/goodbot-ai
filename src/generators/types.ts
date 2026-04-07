@@ -47,7 +47,7 @@ export interface GeneratorContext {
   hasRedFlags: boolean;
   hasCustomRules: boolean;
   hasVerification: boolean;
-  // Optional dependency analysis
+  // Optional dependency analysis (legacy)
   dependencyAnalysis?: {
     moduleCount: number;
     circularDependencyCount: number;
@@ -57,6 +57,38 @@ export interface GeneratorContext {
     topViolations: string[];
   };
   hasAnalysis: boolean;
+  // Full analysis insights for adaptive guardrails
+  analysisInsights?: AnalysisInsights;
+}
+
+/** Structured analysis data for adaptive guardrail generation */
+export interface AnalysisInsights {
+  healthGrade: string;
+  healthScore: number;
+  // Violation counts by category
+  circularDeps: number;
+  barrelViolations: number;
+  layerViolations: number;
+  srpViolations: number;
+  complexityViolations: number;
+  duplicationClusters: number;
+  deadExportCount: number;
+  shallowModules: string[];
+  godModules: string[];
+  // Top problem files (for targeted rules)
+  oversizedFiles: string[];
+  highComplexityFiles: string[];
+  deadExportModules: Array<{ module: string; exports: string[] }>;
+  // Flags for conditional template sections
+  hasCircularDeps: boolean;
+  hasBarrelViolations: boolean;
+  hasLayerViolations: boolean;
+  hasSrpIssues: boolean;
+  hasComplexity: boolean;
+  hasDuplication: boolean;
+  hasDeadExports: boolean;
+  hasShallowModules: boolean;
+  hasGodModules: boolean;
 }
 
 export interface GeneratedFile {

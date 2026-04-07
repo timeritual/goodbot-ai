@@ -52,6 +52,101 @@ When adding a new public function to {{#each businessLogic.allowedIn}}{{this}}{{
 
 {{> solid-principles}}
 
+{{#if analysisInsights}}
+## Known Issues in This Codebase
+
+> These rules are generated from a live analysis of this project (grade: **{{analysisInsights.healthGrade}}**, score: {{analysisInsights.healthScore}}/100). Pay special attention to these areas.
+
+{{#if analysisInsights.hasDeadExports}}
+### Dead Exports — Do Not Create Unused Code
+
+This project has unused exports that nothing imports. Before creating a new export:
+1. **Search** for an existing function that does what you need
+2. If you find one, import and use it instead of writing a new one
+3. If no existing function fits, create the new export and ensure at least one consumer imports it
+
+{{#each analysisInsights.deadExportModules}}
+- **{{module}}** has unused exports: `{{#each exports}}{{this}}{{#unless @last}}`, `{{/unless}}{{/each}}`
+{{/each}}
+{{/if}}
+
+{{#if analysisInsights.hasDuplication}}
+### Code Duplication — Reuse Existing Logic
+
+Duplicated code blocks have been detected across files. Before writing new logic:
+1. **Search the codebase** for similar functions before implementing from scratch
+2. Extract shared patterns into a common utility rather than copying code
+3. If two files contain similar logic, refactor into a shared helper
+{{/if}}
+
+{{#if analysisInsights.hasCircularDeps}}
+### Circular Dependencies — Strict Ban
+
+This project has **{{analysisInsights.circularDeps}}** circular dependency cycle(s). These cause unpredictable load-order bugs. Before adding a new import:
+1. Check that the import does not create a cycle (A → B → A)
+2. If two modules need each other, extract the shared concern into a third module
+3. Never work around circular imports with lazy requires or dynamic imports
+{{/if}}
+
+{{#if analysisInsights.hasBarrelViolations}}
+### Barrel Import Violations — Use Public APIs
+
+This project has **{{analysisInsights.barrelViolations}}** barrel bypass violation(s). Always import from the module's barrel file (`index.ts`), never from internal files:
+- **Correct:** `import { Thing } from '../services'`
+- **Wrong:** `import { Thing } from '../services/thingService'`
+{{/if}}
+
+{{#if analysisInsights.hasLayerViolations}}
+### Layer Violations — Respect the Dependency Direction
+
+This project has **{{analysisInsights.layerViolations}}** layer violation(s). Lower layers must never import from higher layers. Check the layer diagram above before adding cross-module imports.
+{{/if}}
+
+{{#if analysisInsights.hasComplexity}}
+### High Complexity — Keep Functions Simple
+
+These files have high cyclomatic complexity and need careful attention:
+{{#each analysisInsights.highComplexityFiles}}
+- `{{this}}`
+{{/each}}
+
+When modifying these files, look for opportunities to extract helper functions. New code should keep branching logic (if/else/for/while/ternary) minimal.
+{{/if}}
+
+{{#if analysisInsights.hasShallowModules}}
+### Shallow Modules — Add Depth, Not Width
+
+These modules have wide interfaces relative to their implementation:
+{{#each analysisInsights.shallowModules}}
+- `{{this}}`
+{{/each}}
+
+When adding to these modules, focus on adding implementation depth (more logic behind existing exports) rather than adding new exports.
+{{/if}}
+
+{{#if analysisInsights.hasGodModules}}
+### God Modules — Reduce Coupling
+
+These modules have too many dependencies in both directions:
+{{#each analysisInsights.godModules}}
+- `{{this}}`
+{{/each}}
+
+Do not add new dependencies to or from these modules. If you need to extend their functionality, consider splitting into focused sub-modules.
+{{/if}}
+
+{{#if analysisInsights.hasSrpIssues}}
+### Oversized Files
+
+These files exceed the size threshold and should not grow further:
+{{#each analysisInsights.oversizedFiles}}
+- `{{this}}`
+{{/each}}
+
+When modifying these files, look for opportunities to extract functionality into separate files rather than adding more code.
+{{/if}}
+{{/if}}
+
 ## Code Style
 
 - {{#if isTypescript}}TypeScript for all new files{{else}}{{project.language}} for all new files{{/if}}

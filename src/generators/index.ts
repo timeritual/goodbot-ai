@@ -1,5 +1,5 @@
 import type { GoodbotConfig } from '../config/index.js';
-import type { FullAnalysis } from '../analyzers/index.js';
+import type { FullAnalysis, GitHistoryAnalysis, TemporalCoupling } from '../analyzers/index.js';
 import { buildContext } from './context-builder.js';
 import { renderTemplate } from './template-engine.js';
 import type { GeneratedFile } from './types.js';
@@ -25,8 +25,13 @@ const FILE_MAP: Array<{
 
 export { FILE_MAP };
 
-export async function generateAll(config: GoodbotConfig, fullAnalysis?: FullAnalysis): Promise<GeneratedFile[]> {
-  const context = buildContext(config, undefined, fullAnalysis);
+export async function generateAll(
+  config: GoodbotConfig,
+  fullAnalysis?: FullAnalysis,
+  gitHistory?: GitHistoryAnalysis,
+  temporalCouplings?: TemporalCoupling[],
+): Promise<GeneratedFile[]> {
+  const context = buildContext(config, undefined, fullAnalysis, gitHistory, temporalCouplings);
   const files: GeneratedFile[] = [];
 
   for (const entry of FILE_MAP) {

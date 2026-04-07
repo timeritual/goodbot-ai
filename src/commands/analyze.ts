@@ -7,13 +7,15 @@ import { runFullAnalysis, runDependencyAnalysis, summarizeAnalysis } from '../an
 import { generateArchitectureMd } from '../generators/index.js';
 import { loadConfig } from '../config/index.js';
 import { log, safeWriteFile } from '../utils/index.js';
-import type { DependencyAnalysis, FullAnalysis, HealthScore, SolidAnalysis } from '../analyzers/index.js';
+import type { DependencyAnalysis, FullAnalysis, HealthScore, SolidAnalysis, GitHistoryAnalysis, TemporalCoupling } from '../analyzers/index.js';
+import { analyzeGitHistory, findTemporalCoupling } from '../analyzers/index.js';
 
 export const analyzeCommand = new Command('analyze')
   .description('Run deep dependency and SOLID analysis on your project')
   .option('-p, --path <path>', 'Project path', process.cwd())
   .option('--json', 'Output as JSON', false)
   .option('--diagram', 'Generate architecture.md with mermaid dependency diagram', false)
+  .option('--git', 'Include git history analysis (hotspots, AI commits, temporal coupling)', false)
   .action(async (opts) => {
     const projectRoot = opts.path;
     const spinner = ora('Scanning project...').start();
@@ -31,6 +33,15 @@ export const analyzeCommand = new Command('analyze')
 
       const result = await runFullAnalysis(projectRoot, scan.structure, config);
 
+      let gitHistory: GitHistoryAnalysis | undefined;
+      let temporalCouplings: TemporalCoupling[] | undefined;
+
+      if (opts.git) {
+        spinner.text = 'Analyzing git history...';
+        gitHistory = await analyzeGitHistory(projectRoot, 500, scan.structure.srcRoot ?? undefined);
+        temporalCouplings = findTemporalCoupling(gitHistory.commits, 3, 0.5, scan.structure.srcRoot ?? undefined);
+      }
+
       spinner.succeed(`Analysis complete (${result.dependency.timeTakenMs}ms)`);
 
       if (opts.json) {
@@ -45,6 +56,8 @@ export const analyzeCommand = new Command('analyze')
               dependedOnBy: Array.from(m.dependedOnBy),
             })),
           },
+          ...(gitHistory ? { gitHistory: { ...gitHistory, commits: undefined } } : {}),
+          ...(temporalCouplings ? { temporalCouplings } : {}),
         };
         console.log(JSON.stringify(serializable, null, 2));
         return;
@@ -53,6 +66,14 @@ export const analyzeCommand = new Command('analyze')
       renderHealthGrade(result.health);
       renderDependencyAnalysis(result.dependency);
       renderSolidAnalysis(result.solid);
+
+      if (gitHistory) {
+        renderGitHistory(gitHistory);
+      }
+      if (temporalCouplings && temporalCouplings.length > 0) {
+        renderTemporalCoupling(temporalCouplings);
+      }
+
       renderFinalSummary(result);
 
       if (opts.diagram) {
@@ -215,6 +236,54 @@ export function renderSolidAnalysis(solid: SolidAnalysis): void {
     if (remaining > 0) {
       log.dim(`  ... and ${remaining} more`);
     }
+  }
+}
+
+// ─── Git History ─────────────────────────────────────────
+
+function renderGitHistory(history: GitHistoryAnalysis): void {
+  log.header('Git History Analysis');
+  console.log(chalk.dim('─'.repeat(50)));
+
+  const aiPct = Math.round(history.aiCommitRatio * 100);
+  log.table('Commits analyzed', String(history.totalCommits));
+  log.table('AI-authored', `${history.aiCommits} (${aiPct}%)`);
+  log.table('Human-authored', String(history.humanCommits));
+
+  if (history.hotspots.length > 0) {
+    log.header('Hotspots (high churn × complexity)');
+    console.log(chalk.dim('─'.repeat(50)));
+    console.log(
+      `  ${chalk.dim('File'.padEnd(45))} ${chalk.dim('Changes'.padStart(8))} ${chalk.dim('Churn'.padStart(7))} ${chalk.dim('AI'.padStart(4))} ${chalk.dim('Score'.padStart(6))}`,
+    );
+
+    for (const hs of history.hotspots.slice(0, 15)) {
+      const name = hs.file.length > 44 ? '…' + hs.file.slice(-43) : hs.file.padEnd(45);
+      const scoreColor = hs.hotspotScore > 50 ? chalk.red : hs.hotspotScore > 20 ? chalk.yellow : chalk.dim;
+      console.log(
+        `  ${name} ${String(hs.changeCount).padStart(8)} ${String(hs.totalChurn).padStart(7)} ${String(hs.aiChangeCount).padStart(4)} ${scoreColor(String(hs.hotspotScore).padStart(6))}`,
+      );
+    }
+
+    if (history.hotspots.length > 15) {
+      log.dim(`  ... and ${history.hotspots.length - 15} more files`);
+    }
+  }
+}
+
+function renderTemporalCoupling(couplings: TemporalCoupling[]): void {
+  log.header(`Temporal Coupling (${couplings.length} pair${couplings.length !== 1 ? 's' : ''})`);
+  console.log(chalk.dim('─'.repeat(50)));
+
+  for (const tc of couplings.slice(0, 10)) {
+    const strength = Math.round(tc.couplingStrength * 100);
+    const strengthColor = strength >= 80 ? chalk.red : strength >= 60 ? chalk.yellow : chalk.dim;
+    console.log(`  ${chalk.yellow('⚠')} ${tc.fileA} ↔ ${tc.fileB}`);
+    console.log(chalk.dim(`    Co-changed ${tc.coChangeCount} times, strength: ${strengthColor(`${strength}%`)}`));
+  }
+
+  if (couplings.length > 10) {
+    log.dim(`  ... and ${couplings.length - 10} more pairs`);
   }
 }
 

@@ -1,5 +1,5 @@
 import type { GoodbotConfig } from '../config/index.js';
-import type { DependencyAnalysisSummary, FullAnalysis } from '../analyzers/index.js';
+import type { DependencyAnalysisSummary, FullAnalysis, GitHistoryAnalysis, TemporalCoupling } from '../analyzers/index.js';
 import type { GeneratorContext, AnalysisInsights } from './types.js';
 
 function buildLayerDiagram(
@@ -24,7 +24,13 @@ function buildLayerDiagram(
   return lines.join('\n');
 }
 
-export function buildContext(config: GoodbotConfig, analysisSummary?: DependencyAnalysisSummary, fullAnalysis?: FullAnalysis): GeneratorContext {
+export function buildContext(
+  config: GoodbotConfig,
+  analysisSummary?: DependencyAnalysisSummary,
+  fullAnalysis?: FullAnalysis,
+  gitHistory?: GitHistoryAnalysis,
+  temporalCouplings?: TemporalCoupling[],
+): GeneratorContext {
   const { project, architecture, businessLogic, verification, conventions, ignore } = config;
 
   const verificationCommands: Array<{ name: string; command: string }> = [];
@@ -66,11 +72,15 @@ export function buildContext(config: GoodbotConfig, analysisSummary?: Dependency
       topViolations: analysisSummary.topViolations,
     } : undefined,
     hasAnalysis: !!analysisSummary,
-    analysisInsights: fullAnalysis ? buildAnalysisInsights(fullAnalysis) : undefined,
+    analysisInsights: fullAnalysis ? buildAnalysisInsights(fullAnalysis, gitHistory, temporalCouplings) : undefined,
   };
 }
 
-function buildAnalysisInsights(analysis: FullAnalysis): AnalysisInsights {
+function buildAnalysisInsights(
+  analysis: FullAnalysis,
+  gitHistory?: GitHistoryAnalysis,
+  temporalCouplings?: TemporalCoupling[],
+): AnalysisInsights {
   const { dependency: dep, solid, health } = analysis;
 
   const srpViolations = solid.violations.filter(v => v.principle === 'SRP');
@@ -114,6 +124,17 @@ function buildAnalysisInsights(analysis: FullAnalysis): AnalysisInsights {
     oversizedFiles: [...new Set(oversizedViolations.map(v => v.file))].slice(0, 10),
     highComplexityFiles: [...new Set(complexityViolations.map(v => v.file))].slice(0, 10),
     deadExportModules,
+    // Git history insights
+    hotspotFiles: gitHistory
+      ? gitHistory.hotspots.slice(0, 10).map(h => h.file)
+      : [],
+    aiCommitRatio: gitHistory ? Math.round(gitHistory.aiCommitRatio * 100) : 0,
+    temporalCouplings: (temporalCouplings ?? []).slice(0, 5).map(tc => ({
+      fileA: tc.fileA,
+      fileB: tc.fileB,
+      strength: tc.couplingStrength,
+    })),
+    // Flags
     hasCircularDeps: dep.circularDependencies.length > 0,
     hasBarrelViolations: dep.barrelViolations.length > 0,
     hasLayerViolations: dep.layerViolations.length > 0,
@@ -123,5 +144,8 @@ function buildAnalysisInsights(analysis: FullAnalysis): AnalysisInsights {
     hasDeadExports: deadExportViolations.length > 0,
     hasShallowModules: shallowViolations.length > 0,
     hasGodModules: godViolations.length > 0,
+    hasHotspots: (gitHistory?.hotspots.length ?? 0) > 0,
+    hasTemporalCoupling: (temporalCouplings?.length ?? 0) > 0,
+    hasHighAIRatio: (gitHistory?.aiCommitRatio ?? 0) >= 0.3,
   };
 }

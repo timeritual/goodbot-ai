@@ -135,6 +135,38 @@ These modules have too many dependencies in both directions:
 Do not add new dependencies to or from these modules. If you need to extend their functionality, consider splitting into focused sub-modules.
 {{/if}}
 
+{{#if analysisInsights.hasHotspots}}
+### Hotspot Files — High Churn Risk
+
+These files change frequently and are complex. Extra care is needed when modifying them — they are the most likely source of regressions:
+{{#each analysisInsights.hotspotFiles}}
+- `{{this}}`
+{{/each}}
+
+Before modifying a hotspot file, understand its full scope and run all tests.
+{{/if}}
+
+{{#if analysisInsights.hasTemporalCoupling}}
+### Temporal Coupling — Hidden Dependencies
+
+These file pairs always change together but are in different modules. This often means they share logic that should be extracted:
+{{#each analysisInsights.temporalCouplings}}
+- `{{fileA}}` ↔ `{{fileB}}` (coupling: {{strength}})
+{{/each}}
+
+If you modify one file in a coupled pair, check whether the other needs a matching change.
+{{/if}}
+
+{{#if analysisInsights.hasHighAIRatio}}
+### AI-Generated Code — Extra Scrutiny Required
+
+{{analysisInsights.aiCommitRatio}}% of recent commits were AI-authored. AI-generated code tends to:
+- Create new functions instead of reusing existing ones — **always search first**
+- Introduce duplication across files — **check for similar existing logic**
+- Skip integration with existing module boundaries — **follow the layer diagram**
+- Leave behind scaffolding (TODOs, console.logs, placeholder implementations) — **clean up before committing**
+{{/if}}
+
 {{#if analysisInsights.hasSrpIssues}}
 ### Oversized Files
 

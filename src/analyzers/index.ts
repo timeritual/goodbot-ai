@@ -150,7 +150,7 @@ export async function runFullAnalysis(
 
   if (!structure.srcRoot) {
     const dep = emptyAnalysis(0);
-    const solid: SolidAnalysis = { violations: [], scores: { srp: 100, dip: 100, isp: 100, overall: 100 } };
+    const solid: SolidAnalysis = { violations: [], scores: { srp: 0, dip: 0, isp: 0, overall: 0 } };
     const health = calculateHealthScore(dep, solid);
     return { dependency: dep, solid, health };
   }
@@ -160,7 +160,7 @@ export async function runFullAnalysis(
 
   if (sourceFiles.length === 0) {
     const dep = emptyAnalysis(0);
-    const solid: SolidAnalysis = { violations: [], scores: { srp: 100, dip: 100, isp: 100, overall: 100 } };
+    const solid: SolidAnalysis = { violations: [], scores: { srp: 0, dip: 0, isp: 0, overall: 0 } };
     const health = calculateHealthScore(dep, solid);
     return { dependency: dep, solid, health };
   }
@@ -230,7 +230,7 @@ export async function runFullAnalysis(
 
   const solid = await runSolidAnalysis(
     allFileImports, sourceFiles, structure.detectedLayers,
-    projectRoot, srcRootAbsolute, thresholds,
+    projectRoot, srcRootAbsolute, thresholds, modules,
   );
 
   // Custom rules

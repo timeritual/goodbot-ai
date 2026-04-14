@@ -648,7 +648,7 @@ Or use the CLI directly:
 goodbot ci --output pr-comment.md --json result.json
 ```
 
-The PR comment includes health grade with emoji bars, violation counts, and collapsible details — and updates itself on each push.
+The PR comment includes health grade with emoji bars, violation counts, and collapsible details — and updates itself on each push. If a freshness snapshot exists, the comment also includes a **Guardrail Freshness** section showing which claims have drifted since guardrails were last generated.
 
 ### `goodbot trend` — Track Health Over Time
 

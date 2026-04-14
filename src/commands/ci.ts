@@ -3,8 +3,11 @@ import path from 'node:path';
 import ora from 'ora';
 import chalk from 'chalk';
 import { runFullScan } from '../scanners/index.js';
-import { runFullAnalysis, summarizeAnalysis } from '../analyzers/index.js';
+import { runFullAnalysis, summarizeAnalysis, analyzeGitHistory, findTemporalCoupling } from '../analyzers/index.js';
 import { loadConfig } from '../config/index.js';
+import { buildContext } from '../generators/index.js';
+import { loadSnapshot, buildSnapshot, compareFreshness } from '../freshness/index.js';
+import type { FreshnessReport } from '../freshness/index.js';
 import { log, safeWriteFile } from '../utils/index.js';
 import type { FullAnalysis, HealthGrade } from '../analyzers/index.js';
 
@@ -41,9 +44,29 @@ export const ciCommand = new Command('ci')
       try { config = await loadConfig(projectRoot); } catch { /* no config */ }
 
       const result = await runFullAnalysis(projectRoot, scan.structure, config);
+
+      // Build freshness report if snapshot exists
+      let freshnessReport: FreshnessReport | undefined;
+      const stored = await loadSnapshot(projectRoot);
+      if (stored) {
+        spinner.text = 'Checking guardrail freshness...';
+        const gitHistory = await analyzeGitHistory(projectRoot, 500, scan.structure.srcRoot ?? undefined);
+        const temporalCouplings = findTemporalCoupling(gitHistory.commits, 3, 0.5, scan.structure.srcRoot ?? undefined);
+        const context = buildContext(config!, undefined, result, gitHistory, temporalCouplings);
+        if (context.analysisInsights) {
+          const currentSnapshot = buildSnapshot(
+            context.analysisInsights,
+            config?.conventions.customRules ?? [],
+            result.dependency.modules.length,
+            result.dependency.filesParsed,
+          );
+          freshnessReport = compareFreshness(stored, currentSnapshot);
+        }
+      }
+
       spinner.succeed(`Analysis complete (${result.dependency.timeTakenMs}ms)`);
 
-      const markdown = generateCIComment(result, opts.mode, opts.base);
+      const markdown = generateCIComment(result, opts.mode, opts.base, freshnessReport);
 
       // Write outputs
       if (opts.output) {
@@ -64,6 +87,7 @@ export const ciCommand = new Command('ci')
           },
           modules: result.dependency.modules.length,
           filesParsed: result.dependency.filesParsed,
+          freshness: freshnessReport ?? null,
         };
         await safeWriteFile(opts.json, JSON.stringify(serializable, null, 2));
         log.success(`JSON written to ${opts.json}`);
@@ -83,6 +107,7 @@ function generateCIComment(
   analysis: FullAnalysis,
   mode: string,
   baseBranch: string,
+  freshnessReport?: FreshnessReport,
 ): string {
   const { health, solid, dependency: dep } = analysis;
   const summary = summarizeAnalysis(dep);
@@ -155,6 +180,40 @@ function generateCIComment(
 
     lines.push('</details>');
     lines.push('');
+  }
+
+  // Freshness section
+  if (freshnessReport) {
+    const moved = freshnessReport.claims.filter(c => c.status !== 'fresh');
+    if (moved.length > 0) {
+      const statusEmoji = freshnessReport.overallStatus === 'degraded' ? '🔴'
+        : freshnessReport.overallStatus === 'stale' ? '🟡'
+        : '🟢';
+
+      lines.push(`### ${statusEmoji} Guardrail Freshness`);
+      lines.push('');
+      lines.push(`Guardrails were generated **${freshnessReport.daysSinceGeneration}d ago**. These claims have changed:`);
+      lines.push('');
+      lines.push('| Claim | Stored | Current | Status |');
+      lines.push('|-------|--------|---------|--------|');
+      for (const claim of moved) {
+        const emoji = claim.status === 'degraded' ? '❌ degraded'
+          : claim.status === 'improved' ? '✅ improved'
+          : '⚠️ stale';
+        const delta = claim.delta !== undefined
+          ? ` (${claim.delta > 0 ? '+' : ''}${claim.delta})`
+          : '';
+        lines.push(`| ${claim.label} | ${claim.storedValue} | ${claim.currentValue}${delta} | ${emoji} |`);
+      }
+      lines.push('');
+
+      if (freshnessReport.summary.degraded > 0) {
+        lines.push(`> ⚠️ **${freshnessReport.summary.degraded} claim${freshnessReport.summary.degraded > 1 ? 's' : ''} degraded.** Run \`goodbot generate --analyze --force\` to update guardrails.`);
+      } else {
+        lines.push(`> ℹ️ ${moved.length} claim${moved.length > 1 ? 's' : ''} changed. Run \`goodbot generate --analyze --force\` to update guardrails.`);
+      }
+      lines.push('');
+    }
   }
 
   lines.push('---');

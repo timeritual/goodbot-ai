@@ -275,6 +275,8 @@ SOLID Analysis
 
 Analyze only changed files. Shows violations introduced by your current branch — perfect for PR reviews and CI. Doesn't show 50 existing violations, just the delta.
 
+If a freshness snapshot exists (from `generate --analyze`), also shows **guardrail impact** — which claims your changes have moved:
+
 ```
 $ goodbot diff --base main
 
@@ -293,12 +295,22 @@ Violations in Changed Files
     src/services/orderService.ts
 
 ⚠ 1 violation in changed files.
+
+Guardrail Impact
+──────────────────────────────────────────────────
+  Your guardrails were generated 13d ago. This diff has moved:
+
+  ⚠ Health grade: A → B+
+  ✗ SRP violations: 35 → 44 (+9)
+  ↑ Barrel violations: 5 → 3 (-2)
+
+⚠ 2 guardrail claims degraded. Run `goodbot generate --analyze --force` to update.
 ```
 
 | Flag | Description |
 |------|-------------|
 | `--base <branch>` | Base branch to compare against (default: main) |
-| `--json` | Output as JSON |
+| `--json` | Output as JSON (includes freshness report if snapshot exists) |
 
 ### `goodbot watch`
 

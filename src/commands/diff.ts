@@ -3,8 +3,11 @@ import { execSync } from 'node:child_process';
 import ora from 'ora';
 import chalk from 'chalk';
 import { runFullScan } from '../scanners/index.js';
-import { runFullAnalysis } from '../analyzers/index.js';
+import { runFullAnalysis, analyzeGitHistory, findTemporalCoupling } from '../analyzers/index.js';
 import { loadConfig } from '../config/index.js';
+import { buildContext } from '../generators/index.js';
+import { loadSnapshot, buildSnapshot, compareFreshness } from '../freshness/index.js';
+import type { FreshnessReport, FreshnessClaim } from '../freshness/index.js';
 import { log } from '../utils/index.js';
 import { renderHealthGrade } from './analyze.js';
 import type { FullAnalysis } from '../analyzers/index.js';
@@ -37,6 +40,25 @@ export const diffCommand = new Command('diff')
       // Run full analysis on current state
       const current = await runFullAnalysis(projectRoot, scan.structure, config);
 
+      // Build freshness report if snapshot exists
+      let freshnessReport: FreshnessReport | undefined;
+      const stored = await loadSnapshot(projectRoot);
+      if (stored) {
+        spinner.text = 'Comparing against guardrail snapshot...';
+        const gitHistory = await analyzeGitHistory(projectRoot, 500, scan.structure.srcRoot ?? undefined);
+        const temporalCouplings = findTemporalCoupling(gitHistory.commits, 3, 0.5, scan.structure.srcRoot ?? undefined);
+        const context = buildContext(config!, undefined, current, gitHistory, temporalCouplings);
+        if (context.analysisInsights) {
+          const currentSnapshot = buildSnapshot(
+            context.analysisInsights,
+            config?.conventions.customRules ?? [],
+            current.dependency.modules.length,
+            current.dependency.filesParsed,
+          );
+          freshnessReport = compareFreshness(stored, currentSnapshot);
+        }
+      }
+
       spinner.succeed(`Analyzed ${changedFiles.length} changed files (${current.dependency.timeTakenMs}ms)`);
 
       if (opts.json) {
@@ -44,12 +66,13 @@ export const diffCommand = new Command('diff')
           changedFiles,
           health: current.health,
           violations: filterToChangedFiles(current, changedFiles),
+          freshness: freshnessReport,
         };
         console.log(JSON.stringify(output, null, 2));
         return;
       }
 
-      renderDiff(current, changedFiles, opts.base);
+      renderDiff(current, changedFiles, opts.base, freshnessReport);
     } catch (err) {
       spinner.fail('Diff analysis failed');
       log.error(err instanceof Error ? err.message : String(err));
@@ -120,7 +143,12 @@ function filterToChangedFiles(analysis: FullAnalysis, changedFiles: string[]): F
   };
 }
 
-function renderDiff(analysis: FullAnalysis, changedFiles: string[], baseBranch: string): void {
+function renderDiff(
+  analysis: FullAnalysis,
+  changedFiles: string[],
+  baseBranch: string,
+  freshnessReport?: FreshnessReport,
+): void {
   renderHealthGrade(analysis.health);
 
   log.header(`Changes vs ${baseBranch}`);
@@ -133,26 +161,65 @@ function renderDiff(analysis: FullAnalysis, changedFiles: string[], baseBranch: 
   if (totalNew === 0) {
     console.log();
     log.success('No violations in changed files. Good bot!');
-    return;
+  } else {
+    log.table('Layer violations', filtered.layerViolations === 0
+      ? chalk.green('0') : chalk.red(String(filtered.layerViolations)));
+    log.table('Barrel violations', filtered.barrelViolations === 0
+      ? chalk.green('0') : chalk.red(String(filtered.barrelViolations)));
+    log.table('SOLID violations', filtered.solidViolations === 0
+      ? chalk.green('0') : chalk.yellow(String(filtered.solidViolations)));
+
+    log.header('Violations in Changed Files');
+    console.log(chalk.dim('─'.repeat(50)));
+
+    for (const d of filtered.details) {
+      const icon = d.type === 'layer' || d.type === 'barrel' ? chalk.red('✗') : chalk.yellow('⚠');
+      const tag = chalk.dim(`[${d.type}]`);
+      console.log(`  ${icon} ${tag} ${d.message}`);
+      console.log(chalk.dim(`    ${d.file}`));
+    }
+
+    console.log();
+    log.warn(`${totalNew} violation${totalNew > 1 ? 's' : ''} in changed files.`);
   }
 
-  log.table('Layer violations', filtered.layerViolations === 0
-    ? chalk.green('0') : chalk.red(String(filtered.layerViolations)));
-  log.table('Barrel violations', filtered.barrelViolations === 0
-    ? chalk.green('0') : chalk.red(String(filtered.barrelViolations)));
-  log.table('SOLID violations', filtered.solidViolations === 0
-    ? chalk.green('0') : chalk.yellow(String(filtered.solidViolations)));
+  // Show freshness impact if snapshot exists
+  if (freshnessReport) {
+    renderFreshnessImpact(freshnessReport);
+  }
+}
 
-  log.header('Violations in Changed Files');
+function renderFreshnessImpact(report: FreshnessReport): void {
+  const moved = report.claims.filter(c => c.status !== 'fresh');
+  if (moved.length === 0) return;
+
+  console.log();
+  log.header('Guardrail Impact');
   console.log(chalk.dim('─'.repeat(50)));
+  console.log(chalk.dim(`  Your guardrails were generated ${report.daysSinceGeneration}d ago. This diff has moved:`));
+  console.log();
 
-  for (const d of filtered.details) {
-    const icon = d.type === 'layer' || d.type === 'barrel' ? chalk.red('✗') : chalk.yellow('⚠');
-    const tag = chalk.dim(`[${d.type}]`);
-    console.log(`  ${icon} ${tag} ${d.message}`);
-    console.log(chalk.dim(`    ${d.file}`));
+  for (const claim of moved) {
+    const icon = claimIcon(claim.status);
+    const delta = claim.delta !== undefined
+      ? ` (${claim.delta > 0 ? '+' : ''}${claim.delta})`
+      : '';
+    console.log(`  ${icon} ${claim.label}: ${claim.storedValue} → ${claim.currentValue}${delta}`);
   }
 
   console.log();
-  log.warn(`${totalNew} violation${totalNew > 1 ? 's' : ''} in changed files.`);
+  if (report.summary.degraded > 0) {
+    log.warn(`${report.summary.degraded} guardrail claim${report.summary.degraded > 1 ? 's' : ''} degraded. Run \`goodbot generate --analyze --force\` to update.`);
+  } else {
+    log.info(`${moved.length} guardrail claim${moved.length > 1 ? 's' : ''} changed. Run \`goodbot generate --analyze --force\` to update.`);
+  }
+}
+
+function claimIcon(status: FreshnessClaim['status']): string {
+  switch (status) {
+    case 'fresh': return chalk.green('✓');
+    case 'stale': return chalk.yellow('⚠');
+    case 'degraded': return chalk.red('✗');
+    case 'improved': return chalk.blue('↑');
+  }
 }

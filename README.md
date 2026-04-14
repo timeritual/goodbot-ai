@@ -138,14 +138,30 @@ $ goodbot generate
 ✓ .cursorignore
 ```
 
+Use `--analyze` to generate **adaptive guardrails** — rules that reflect your actual codebase state, not just generic best practices:
+
+```
+$ goodbot generate --analyze
+
+✔ Analysis complete — B+ (81/100), 38 commits (3% AI)
+✔ Generated 6 files
+✓ CODING_GUIDELINES.md
+✓ CLAUDE.md
+...
+Snapshot saved for freshness tracking.
+```
+
+With `--analyze`, guardrails include your current health grade, specific violation counts, hotspot files, and known issues — so AI agents know exactly what to watch out for. A snapshot is also saved for [freshness tracking](#goodbot-freshness).
+
 | Flag | Description |
 |------|-------------|
+| `--analyze` | Run analysis first and generate adaptive guardrails based on findings |
 | `--dry-run` | Preview what would be generated without writing |
 | `--force` | Overwrite existing files without prompting |
 
 ### `goodbot check`
 
-Detects when generated files have been manually edited or gone missing. Returns exit code 1 on drift — perfect for CI.
+Detects when generated files have been manually edited or gone missing, and warns when your analysis snapshot is getting old. Returns exit code 1 on drift — perfect for CI.
 
 ```
 $ goodbot check
@@ -156,9 +172,12 @@ $ goodbot check
   .windsurfrules                ✓ in sync
   AGENTS.md                     ✓ in sync
   .cursorignore                 ✗ missing
+  ⚠ Snapshot is 12 days old. Run goodbot freshness to verify claims.
 
-⚠ 2 issues found. Run `goodbot generate --force` to regenerate.
+⚠ 3 issues found. Run `goodbot generate --force` to regenerate.
 ```
+
+If you generated with `--analyze`, the snapshot age is also checked. Snapshots older than 7 days trigger a warning to run `goodbot freshness`.
 
 ### `goodbot scan`
 
@@ -340,6 +359,58 @@ Exits with code 1 if grade is D or F — use it as a pre-commit hook:
 # .husky/pre-commit
 goodbot score --no-color || echo "Architecture health too low!"
 ```
+
+### `goodbot freshness`
+
+The guardrails you generated last week claim "2 circular deps" and "health grade B+" — but is that still true? `freshness` compares your stored snapshot against a fresh analysis and tells you exactly what's changed.
+
+```
+$ goodbot freshness
+
+Guardrail Freshness Report (generated 12 days ago)
+───────────────────────────────────────────────────────
+  Health grade             A → B+    ⚠ stale
+  Health score             90 → 81 (-9)    ✗ degraded
+  Circular dependencies    0    ✓ fresh
+  Barrel violations        0 → 1 (+1)    ✗ degraded
+  Layer violations         0    ✓ fresh
+  SRP violations           30 → 43 (+13)    ✗ degraded
+  Dead exports             0 → 3 (+3)    ✗ degraded
+  Hotspot files            10    ✓ fresh
+  AI commit ratio          3    ✓ fresh
+  Custom rules             0 rules    ✓ fresh
+
+  8 fresh · 1 stale · 6 degraded
+
+✗ Your guardrails are stale and codebase health has degraded.
+⚠ Run `goodbot generate --analyze --force` to update.
+```
+
+Requires a snapshot from a previous `goodbot generate --analyze` run. Exits with code 1 if any claims are degraded — use it in CI to catch guardrail drift.
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output full freshness report as JSON |
+| `--path <path>` | Project path |
+
+### `goodbot hooks`
+
+Install lightweight git hooks that automatically check for stale guardrails.
+
+```
+$ goodbot hooks install
+
+  post-merge       ✓ installed
+  pre-push         ✓ installed
+
+✓ 2 hooks installed.
+Hooks are advisory — they warn but do not block.
+```
+
+- **post-merge** — runs `goodbot check` after every merge (surfaces stale snapshots)
+- **pre-push** — runs `goodbot freshness` before push (warns if codebase has degraded)
+
+Hooks are safe: they append to existing hooks (won't overwrite husky, lint-staged, etc.), and `goodbot hooks uninstall` cleanly removes only the goodbot sections.
 
 ### `goodbot pr`
 
@@ -690,6 +761,10 @@ Custom rules are checked during `goodbot analyze` and appear alongside SOLID vio
 - name: Check AI guardrails
   run: npx goodbot-ai check
 
+# Fail if guardrails have degraded since last generate
+- name: Check guardrail freshness
+  run: npx goodbot-ai freshness
+
 # PR analysis with comment
 - uses: timeritual/goodbot-ai@main
   with:
@@ -705,6 +780,12 @@ Custom rules are checked during `goodbot analyze` and appear alongside SOLID vio
 
 All commands return exit code 1 on violations — fail the build and keep your AI agents honest.
 
+For local development, install git hooks to catch staleness automatically:
+
+```bash
+goodbot hooks install
+```
+
 ---
 
 ## Command Reference
@@ -714,8 +795,10 @@ All commands return exit code 1 on violations — fail the build and keep your A
 | Command | Description |
 |---------|-------------|
 | `goodbot init` | Interactive project setup (or `--preset strict\|recommended\|relaxed`) |
-| `goodbot generate` | Generate AI agent guardrail files |
-| `goodbot check` | Detect drift in generated files |
+| `goodbot generate` | Generate AI agent guardrail files (`--analyze` for adaptive guardrails) |
+| `goodbot check` | Detect drift in generated files + snapshot age |
+| `goodbot freshness` | Compare guardrail claims against current codebase reality |
+| `goodbot hooks` | Install/uninstall git hooks for automatic freshness checks |
 | `goodbot scan` | Quick project structure detection (framework, layers, commands) |
 | `goodbot scan --analyze` | Scan + condensed health grade and architecture summary |
 | `goodbot analyze` | Full architecture + SOLID analysis with detailed health grade |

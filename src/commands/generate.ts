@@ -3,10 +3,11 @@ import path from 'node:path';
 import ora from 'ora';
 import chalk from 'chalk';
 import { loadConfig, saveChecksums } from '../config/index.js';
-import { generateAll } from '../generators/index.js';
+import { generateAll, buildContext } from '../generators/index.js';
 import { runFullScan } from '../scanners/index.js';
 import { runFullAnalysis, analyzeGitHistory, findTemporalCoupling } from '../analyzers/index.js';
 import type { FullAnalysis, GitHistoryAnalysis, TemporalCoupling } from '../analyzers/index.js';
+import { buildSnapshot, saveSnapshot } from '../freshness/index.js';
 import { log, safeWriteFile, safeReadFile, contentHash } from '../utils/index.js';
 
 export const generateCommand = new Command('generate')
@@ -84,6 +85,22 @@ export const generateCommand = new Command('generate')
 
       if (!opts.dryRun) {
         await saveChecksums(projectRoot, checksums);
+
+        // Save analysis snapshot for freshness tracking
+        if (fullAnalysis) {
+          const context = buildContext(config, undefined, fullAnalysis, gitHistory, temporalCouplings);
+          if (context.analysisInsights) {
+            const snapshot = buildSnapshot(
+              context.analysisInsights,
+              config.conventions.customRules,
+              fullAnalysis.dependency.modules.length,
+              fullAnalysis.dependency.filesParsed,
+            );
+            await saveSnapshot(projectRoot, snapshot);
+            log.dim('Snapshot saved for freshness tracking.');
+          }
+        }
+
         console.log();
         log.dim('Run `goodbot check` to verify files stay in sync.');
       }

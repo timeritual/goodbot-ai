@@ -3,6 +3,7 @@ import path from 'node:path';
 import chalk from 'chalk';
 import { loadConfig, loadChecksums } from '../config/index.js';
 import { FILE_MAP } from '../generators/index.js';
+import { loadSnapshot } from '../freshness/index.js';
 import { log, safeReadFile, contentHash, fileExists } from '../utils/index.js';
 
 export const checkCommand = new Command('check')
@@ -60,6 +61,22 @@ export const checkCommand = new Command('check')
         console.log(`  ${entry.displayName.padEnd(28)} ${chalk.red('✗ drifted')} ${chalk.dim('(manually edited)')}`);
         issues++;
       }
+    }
+
+    // Snapshot age check
+    const snapshot = await loadSnapshot(projectRoot);
+    if (snapshot) {
+      const daysSince = Math.floor(
+        (Date.now() - new Date(snapshot.generatedAt).getTime()) / (1000 * 60 * 60 * 24),
+      );
+      if (daysSince > 7) {
+        console.log(`  ${chalk.yellow('⚠')} Snapshot is ${daysSince} days old. Run ${chalk.cyan('goodbot freshness')} to verify claims.`);
+        issues++;
+      } else {
+        console.log(`  ${'Snapshot age'.padEnd(28)} ${chalk.green(`✓ ${daysSince}d old`)}`);
+      }
+    } else {
+      console.log(`  ${'Snapshot'.padEnd(28)} ${chalk.dim('none (run generate --analyze for freshness tracking)')}`);
     }
 
     console.log();

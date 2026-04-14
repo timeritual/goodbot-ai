@@ -14,6 +14,8 @@ import { trendCommand } from './commands/trend.js';
 import { syncCommand } from './commands/sync.js';
 import { reportCommand } from './commands/report.js';
 import { onboardCommand } from './commands/onboard.js';
+import { freshnessCommand } from './commands/freshness.js';
+import { hooksCommand } from './commands/hooks.js';
 
 const program = new Command();
 
@@ -33,6 +35,8 @@ program.addCommand(watchCommand);
 program.addCommand(fixCommand);
 program.addCommand(scoreCommand);
 program.addCommand(prCommand);
+program.addCommand(freshnessCommand);
+program.addCommand(hooksCommand);
 
 // Team tier
 program.addCommand(ciCommand);

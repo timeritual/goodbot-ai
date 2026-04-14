@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "project": {
+    "name": "goodbot-ai",
+    "framework": "node",
+    "language": "typescript"
+  },
+  "architecture": {
+    "layers": [
+      {
+        "name": "config",
+        "path": "src/config",
+        "level": 1,
+        "hasBarrel": true
+      },
+      {
+        "name": "utils",
+        "path": "src/utils",
+        "level": 1,
+        "hasBarrel": true
+      },
+      {
+        "name": "analyzers",
+        "path": "src/analyzers",
+        "level": 5,
+        "hasBarrel": true
+      },
+      {
+        "name": "commands",
+        "path": "src/commands",
+        "level": 5,
+        "hasBarrel": false
+      },
+      {
+        "name": "freshness",
+        "path": "src/freshness",
+        "level": 5,
+        "hasBarrel": true
+      },
+      {
+        "name": "generators",
+        "path": "src/generators",
+        "level": 5,
+        "hasBarrel": true
+      },
+      {
+        "name": "scanners",
+        "path": "src/scanners",
+        "level": 5,
+        "hasBarrel": true
+      },
+      {
+        "name": "templates",
+        "path": "src/templates",
+        "level": 5,
+        "hasBarrel": false
+      }
+    ],
+    "dependencyDirection": "downward",
+    "barrelImportRule": "always",
+    "interfaceContracts": false
+  },
+  "businessLogic": {
+    "allowedIn": [
+      "services"
+    ],
+    "forbiddenIn": [
+      "routes",
+      "controllers"
+    ],
+    "redFlags": [
+      "Business logic in route handlers",
+      "Direct database calls in controllers",
+      "Missing error handling in async operations"
+    ]
+  },
+  "verification": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "test": "npm test",
+    "format": null,
+    "build": "npm run build"
+  },
+  "agentFiles": {
+    "claudeMd": true,
+    "cursorrules": true,
+    "windsurfrules": true,
+    "agentsMd": true,
+    "cursorignore": true,
+    "codingGuidelines": true
+  },
+  "conventions": {
+    "mainBranch": "main",
+    "importStyle": "barrel",
+    "customRules": []
+  },
+  "analysis": {
+    "solid": true,
+    "thresholds": {
+      "maxFileLines": 300,
+      "maxBarrelExports": 15,
+      "maxModuleCoupling": 8
+    }
+  },
+  "customRulesConfig": [],
+  "team": {},
+  "ignore": {
+    "paths": [
+      "node_modules",
+      "dist",
+      "build",
+      "coverage",
+      "*.lock",
+      ".env",
+      ".env.*"
+    ],
+    "sensitiveFiles": [
+      ".env",
+      ".env.*",
+      "credentials.json",
+      "*.pem",
+      "*.key"
+    ]
+  }
+}

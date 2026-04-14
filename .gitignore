@@ -2,3 +2,8 @@ node_modules/
 dist/
 *.tsbuildinfo
 .DS_Store
+
+# goodbot artifacts (regenerated on every `goodbot generate`)
+.goodbot/checksums.json
+.goodbot/snapshot.json
+.goodbot/history.json

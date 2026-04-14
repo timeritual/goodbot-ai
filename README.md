@@ -679,6 +679,26 @@ Latest vs Previous
 
 Add `goodbot trend --record` to your CI pipeline to track every merge to main.
 
+Use `--effectiveness` to see which rule categories are getting better or worse over time — the ones that consistently worsen may need clearer guardrail rules:
+
+```
+$ goodbot trend --effectiveness
+
+Rule Effectiveness
+───────────────────────────────────────────────────────
+  3 entries from Mar 15, 2026 → Apr 14, 2026
+
+  Category              First Latest    Delta    Trend
+  ──────────────────── ────── ────── ──────── ────────
+  Circular deps             1      0       -1   ↓ better
+  Layer violations          2      0       -2   ↓ better
+  SRP                      55     46       -9   ↓ better
+  Duplication               8      3       -5   ↓ better
+  Dead exports              6      3       -3   ↓ better
+
+✓ Improving: Circular deps, Layer violations, SRP, Duplication, Dead exports
+```
+
 ### `goodbot sync` — Shared Team Config
 
 One team lead configures the rules. All repos inherit them.
@@ -825,7 +845,7 @@ goodbot hooks install
 | Command | Description |
 |---------|-------------|
 | `goodbot ci` | CI/CD analysis with PR comment output |
-| `goodbot trend` | Track health score over time |
+| `goodbot trend` | Track health score over time (`--effectiveness` for per-rule trends) |
 | `goodbot sync` | Sync shared team config across repos |
 | `goodbot report` | Multi-repo health dashboard |
 | `goodbot onboard` | Generate new developer onboarding guide |

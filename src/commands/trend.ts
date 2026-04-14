@@ -24,6 +24,11 @@ interface TrendEntry {
     barrel: number;
     stability: number;
     solid: number;
+    // Granular categories for effectiveness tracking
+    srp?: number;
+    complexity?: number;
+    duplication?: number;
+    deadExports?: number;
   };
   modules: number;
   filesParsed: number;
@@ -41,6 +46,7 @@ export const trendCommand = new Command('trend')
   .description('Track architecture health over time')
   .option('-p, --path <path>', 'Project path', process.cwd())
   .option('--record', 'Record current score to history', false)
+  .option('--effectiveness', 'Show which violation categories are trending up or down', false)
   .option('--json', 'Output as JSON', false)
   .option('-n, --last <count>', 'Show last N entries', '20')
   .action(async (opts) => {
@@ -63,6 +69,11 @@ export const trendCommand = new Command('trend')
       return;
     }
 
+    if (opts.effectiveness) {
+      renderEffectiveness(history, parseInt(opts.last, 10));
+      return;
+    }
+
     renderTrend(history, parseInt(opts.last, 10));
   });
 
@@ -76,6 +87,9 @@ async function recordEntry(projectRoot: string): Promise<void> {
   const result = await runFullAnalysis(projectRoot, scan.structure, config);
   spinner.succeed('Analysis complete');
 
+  const solidViolations = result.solid.violations;
+  const srpViolations = solidViolations.filter(v => v.principle === 'SRP');
+
   const entry: TrendEntry = {
     date: new Date().toISOString(),
     grade: result.health.grade,
@@ -86,7 +100,11 @@ async function recordEntry(projectRoot: string): Promise<void> {
       layer: result.dependency.layerViolations.length,
       barrel: result.dependency.barrelViolations.length,
       stability: result.dependency.stabilityViolations.length,
-      solid: result.solid.violations.filter((v) => v.severity === 'error').length,
+      solid: solidViolations.filter((v) => v.severity === 'error').length,
+      srp: srpViolations.length,
+      complexity: srpViolations.filter(v => v.message.includes('complexity') || v.message.includes('Complexity')).length,
+      duplication: srpViolations.filter(v => v.message.includes('duplicat')).length,
+      deadExports: solidViolations.filter(v => v.message.includes('Dead export')).length,
     },
     modules: result.dependency.modules.length,
     filesParsed: result.dependency.filesParsed,
@@ -173,6 +191,95 @@ function renderTrend(history: TrendHistory, count: number): void {
 
   console.log();
   log.dim('Run `goodbot trend --record` after each sprint to track progress.');
+}
+
+function renderEffectiveness(history: TrendHistory, count: number): void {
+  const entries = history.entries.slice(-count);
+
+  if (entries.length < 2) {
+    log.info('Need at least 2 recorded entries. Run `goodbot trend --record` to add more.');
+    return;
+  }
+
+  const oldest = entries[0];
+  const latest = entries[entries.length - 1];
+
+  log.header('Rule Effectiveness');
+  console.log(chalk.dim('─'.repeat(55)));
+  console.log(chalk.dim(`  ${entries.length} entries from ${formatDate(oldest.date)} → ${formatDate(latest.date)}`));
+  console.log();
+
+  const categories: Array<{
+    label: string;
+    key: keyof TrendEntry['violations'];
+    description: string;
+  }> = [
+    { label: 'Circular deps', key: 'circular', description: 'Dependency cycles' },
+    { label: 'Layer violations', key: 'layer', description: 'Upward layer imports' },
+    { label: 'Barrel violations', key: 'barrel', description: 'Barrel bypass imports' },
+    { label: 'SDP violations', key: 'stability', description: 'Stable→unstable deps' },
+    { label: 'SOLID errors', key: 'solid', description: 'Principle violations' },
+    { label: 'SRP', key: 'srp', description: 'Single responsibility' },
+    { label: 'Complexity', key: 'complexity', description: 'High cyclomatic complexity' },
+    { label: 'Duplication', key: 'duplication', description: 'Duplicated code blocks' },
+    { label: 'Dead exports', key: 'deadExports', description: 'Unused public exports' },
+  ];
+
+  // Table header
+  console.log(`  ${'Category'.padEnd(20)} ${'First'.padStart(6)} ${'Latest'.padStart(6)} ${'Delta'.padStart(8)} ${'Trend'.padStart(8)}`);
+  console.log(chalk.dim(`  ${'─'.repeat(20)} ${'─'.repeat(6)} ${'─'.repeat(6)} ${'─'.repeat(8)} ${'─'.repeat(8)}`));
+
+  for (const cat of categories) {
+    const firstVal = oldest.violations[cat.key] ?? 0;
+    const latestVal = latest.violations[cat.key] ?? 0;
+    const delta = latestVal - firstVal;
+
+    // Compute trend from all entries (simple: compare first half avg vs second half avg)
+    const values = entries.map(e => e.violations[cat.key] ?? 0);
+    const midpoint = Math.floor(values.length / 2);
+    const firstHalf = values.slice(0, midpoint);
+    const secondHalf = values.slice(midpoint);
+    const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
+    const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
+    const trendDelta = secondAvg - firstAvg;
+
+    const deltaStr = delta === 0 ? chalk.dim('  ±0')
+      : delta > 0 ? chalk.red(`  +${delta}`)
+      : chalk.green(`  ${delta}`);
+
+    const trendStr = Math.abs(trendDelta) < 0.5 ? chalk.dim('  stable')
+      : trendDelta > 0 ? chalk.red('  ↑ worse')
+      : chalk.green('  ↓ better');
+
+    console.log(`  ${cat.label.padEnd(20)} ${String(firstVal).padStart(6)} ${String(latestVal).padStart(6)} ${deltaStr.padStart(8)} ${trendStr}`);
+  }
+
+  console.log();
+
+  // Summary
+  const improving = categories.filter(cat => {
+    const firstVal = oldest.violations[cat.key] ?? 0;
+    const latestVal = latest.violations[cat.key] ?? 0;
+    return latestVal < firstVal;
+  });
+  const worsening = categories.filter(cat => {
+    const firstVal = oldest.violations[cat.key] ?? 0;
+    const latestVal = latest.violations[cat.key] ?? 0;
+    return latestVal > firstVal;
+  });
+
+  if (worsening.length > 0) {
+    log.warn(`Getting worse: ${worsening.map(c => c.label).join(', ')}`);
+  }
+  if (improving.length > 0) {
+    log.success(`Improving: ${improving.map(c => c.label).join(', ')}`);
+  }
+  if (worsening.length === 0 && improving.length === 0) {
+    log.info('All categories stable.');
+  }
+
+  console.log();
+  log.dim('Categories that consistently worsen may need clearer guardrail rules.');
 }
 
 function formatDate(iso: string): string {

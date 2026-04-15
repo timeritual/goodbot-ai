@@ -30,7 +30,7 @@ export async function checkShallowModules(
   detectedLayers: DetectedLayer[],
   sourceFiles: string[],
   srcRootAbsolute: string,
-  thresholds: AnalysisThresholds,
+  _thresholds: AnalysisThresholds,
 ): Promise<{ violations: SolidViolation[]; shallowModules: ShallowModuleResult[] }> {
   const violations: SolidViolation[] = [];
   const shallowModules: ShallowModuleResult[] = [];

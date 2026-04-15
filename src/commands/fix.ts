@@ -63,7 +63,6 @@ async function fixMissingBarrels(
   if (!structure.srcRoot) return 0;
 
   let fixCount = 0;
-  const srcRoot = path.join(projectRoot, structure.srcRoot);
 
   for (const layer of structure.detectedLayers) {
     if (layer.hasBarrel) continue;
@@ -170,10 +169,8 @@ interface SplitPoint {
 
 async function findSplitPoints(filePath: string): Promise<SplitPoint[]> {
   const splits: SplitPoint[] = [];
-  const basename = path.basename(filePath, path.extname(filePath));
   let lineNumber = 0;
   let lastExportLine = 0;
-  let linesSinceExport = 0;
   let exportCount = 0;
 
   const rl = createInterface({

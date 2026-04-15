@@ -1,9 +1,9 @@
 import path from 'node:path';
-import type { StructureAnalysis, DetectedLayer } from '../scanners/index.js';
+import type { StructureAnalysis } from '../scanners/index.js';
 import type { GoodbotConfig } from '../config/index.js';
 import type {
   DependencyAnalysis, DependencyAnalysisSummary, FileImports,
-  FullAnalysis, SolidAnalysis, HealthScore, AnalysisThresholds,
+  FullAnalysis, SolidAnalysis, AnalysisThresholds,
 } from './types.js';
 import { DEFAULT_THRESHOLDS } from './types.js';
 import { parseFileImports } from './import-parser.js';

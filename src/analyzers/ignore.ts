@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { safeReadFile } from '../utils/index.js';
-import type { SolidViolation, LayerViolation, BarrelViolation, CircularDependency, StabilityViolation } from './types.js';
+import type { SolidViolation, LayerViolation, BarrelViolation } from './types.js';
 
 interface IgnoreRule {
   pattern: string;  // glob-like file pattern or exact path

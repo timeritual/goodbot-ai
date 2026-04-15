@@ -161,7 +161,6 @@ function renderTrend(history: TrendHistory, count: number): void {
   console.log();
   for (const entry of sparkline) {
     const color = gradeColor(entry.grade);
-    const date = '';
     console.log(`  ${color(entry.bar)} ${chalk.dim(String(entry.score))}`);
   }
 

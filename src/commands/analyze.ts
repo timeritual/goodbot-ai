@@ -3,7 +3,7 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { runFullScan } from '../scanners/index.js';
 import path from 'node:path';
-import { runFullAnalysis, runDependencyAnalysis, summarizeAnalysis } from '../analyzers/index.js';
+import { runFullAnalysis, summarizeAnalysis } from '../analyzers/index.js';
 import { generateArchitectureMd } from '../generators/index.js';
 import { loadConfig } from '../config/index.js';
 import { log, safeWriteFile } from '../utils/index.js';

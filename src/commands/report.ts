@@ -6,7 +6,7 @@ import { runFullScan } from '../scanners/index.js';
 import { runFullAnalysis } from '../analyzers/index.js';
 import { loadConfig } from '../config/index.js';
 import { log, safeWriteFile } from '../utils/index.js';
-import type { FullAnalysis, HealthGrade } from '../analyzers/index.js';
+import type { FullAnalysis } from '../analyzers/index.js';
 
 interface RepoResult {
   name: string;

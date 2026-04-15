@@ -5,7 +5,6 @@ import type {
   SolidScores,
   SolidViolation,
   AnalysisThresholds,
-  DEFAULT_THRESHOLDS,
 } from './types.js';
 import { DEFAULT_THRESHOLDS as DEFAULTS } from './types.js';
 import type { DetectedLayer } from '../scanners/index.js';

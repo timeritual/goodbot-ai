@@ -1,9 +1,7 @@
 import { Command } from 'commander';
-import path from 'node:path';
 import ora from 'ora';
-import chalk from 'chalk';
 import { runFullScan } from '../scanners/index.js';
-import { runFullAnalysis, summarizeAnalysis, analyzeGitHistory, findTemporalCoupling } from '../analyzers/index.js';
+import { runFullAnalysis, analyzeGitHistory, findTemporalCoupling } from '../analyzers/index.js';
 import { loadConfig } from '../config/index.js';
 import { buildContext } from '../generators/index.js';
 import { loadSnapshot, buildSnapshot, compareFreshness } from '../freshness/index.js';
@@ -110,7 +108,6 @@ function generateCIComment(
   freshnessReport?: FreshnessReport,
 ): string {
   const { health, solid, dependency: dep } = analysis;
-  const summary = summarizeAnalysis(dep);
 
   const gradeEmoji = health.grade.startsWith('A') ? '🟢'
     : health.grade.startsWith('B') ? '🔵'

@@ -1,7 +1,6 @@
 import { Command } from 'commander';
 import path from 'node:path';
 import ora from 'ora';
-import chalk from 'chalk';
 import { runFullScan } from '../scanners/index.js';
 import { runFullAnalysis } from '../analyzers/index.js';
 import { loadConfig, type GoodbotConfig } from '../config/index.js';
@@ -44,7 +43,7 @@ function generateOnboardingGuide(
   config?: GoodbotConfig,
 ): string {
   const lines: string[] = [];
-  const { health, dependency: dep, solid } = analysis;
+  const { health, dependency: dep } = analysis;
 
   // Header
   lines.push(`# Developer Onboarding — ${scan.projectName}`);

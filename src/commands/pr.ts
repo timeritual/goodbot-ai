@@ -65,7 +65,7 @@ function getChangedFiles(projectRoot: string, baseBranch: string): string[] {
 function generatePRDescription(
   analysis: FullAnalysis,
   changedFiles: string[],
-  baseBranch: string,
+  _baseBranch: string,
 ): string {
   const { health, solid, dependency: dep } = analysis;
   const grade = health.grade;

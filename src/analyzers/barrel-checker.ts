@@ -45,7 +45,6 @@ export function findBarrelViolations(
         targetParts.length === 1;
 
       if (!isBarrelImport) {
-        const layer = barrelModules.get(targetModule)!;
         const suggestion = imp.specifier.replace(
           /\/[^/]+$/,
           '',

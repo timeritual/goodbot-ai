@@ -105,6 +105,7 @@ function getChangedFiles(projectRoot: string, baseBranch: string): string[] {
         .filter((f) => f.trim())
         .filter((f) => /\.(ts|tsx|js|jsx)$/.test(f));
     } catch {
+      log.warn('Could not read git history. Are you in a git repository?');
       return [];
     }
   }

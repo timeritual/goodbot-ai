@@ -44,7 +44,8 @@ export const generateCommand = new Command('generate')
           `Analysis complete — ${fullAnalysis.health.grade} (${fullAnalysis.health.score}/100), ${gitHistory.totalCommits} commits (${aiPct}% AI)`,
         );
       } catch (err) {
-        analyzeSpinner.warn('Analysis failed, generating without analysis data');
+        analyzeSpinner.warn('Analysis failed — generating without analysis data');
+        log.dim(`  ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 

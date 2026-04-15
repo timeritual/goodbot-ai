@@ -21,7 +21,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build"
   },
   "engines": {
     "node": ">=18"
@@ -41,6 +41,14 @@
   ],
   "author": "protocoding",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/timeritual/goodbot-ai.git"
+  },
+  "homepage": "https://github.com/timeritual/goodbot-ai#readme",
+  "bugs": {
+    "url": "https://github.com/timeritual/goodbot-ai/issues"
+  },
   "dependencies": {
     "chalk": "^5.3.0",
     "chokidar": "^4.0.3",

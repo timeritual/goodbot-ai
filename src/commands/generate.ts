@@ -7,7 +7,7 @@ import { generateAll, buildContext } from '../generators/index.js';
 import { runFullScan } from '../scanners/index.js';
 import { runFullAnalysis, analyzeGitHistory, findTemporalCoupling } from '../analyzers/index.js';
 import type { FullAnalysis, GitHistoryAnalysis, TemporalCoupling } from '../analyzers/index.js';
-import { buildSnapshot, saveSnapshot } from '../freshness/index.js';
+import { buildSnapshot, saveSnapshot, loadSnapshot } from '../freshness/index.js';
 import { log, safeWriteFile, safeReadFile, contentHash } from '../utils/index.js';
 
 export const generateCommand = new Command('generate')
@@ -31,7 +31,17 @@ export const generateCommand = new Command('generate')
     let gitHistory: GitHistoryAnalysis | undefined;
     let temporalCouplings: TemporalCoupling[] | undefined;
 
-    if (opts.analyze) {
+    // Auto-analyze on first run (no existing snapshot)
+    let shouldAnalyze = opts.analyze;
+    if (!shouldAnalyze) {
+      const existingSnapshot = await loadSnapshot(projectRoot);
+      if (!existingSnapshot) {
+        shouldAnalyze = true;
+        log.info('First run detected — analyzing codebase for adaptive guardrails.');
+      }
+    }
+
+    if (shouldAnalyze) {
       const analyzeSpinner = ora('Analyzing project for adaptive guardrails...').start();
       try {
         const scan = await runFullScan(projectRoot);

@@ -34,54 +34,60 @@ Every team using AI agents ends up writing the same boilerplate: `CLAUDE.md`, `.
 
 ## The Solution
 
-**goodbot** scans your codebase, detects your framework, language, architecture, and conventions — then generates a complete set of AI agent guardrail files from a single source of truth. It also continuously analyzes your codebase for architectural violations, SOLID principle adherence, and gives you a single health grade.
+**goodbot** scans your codebase, detects your framework, language, architecture, and conventions — then generates a complete set of AI agent guardrail files from a single source of truth. It continuously analyzes your codebase for architectural violations, SOLID principles, code duplication, dead exports, and complexity — and gives you a single health grade.
+
+More importantly, **goodbot detects when your guardrails go stale**. As your codebase evolves, the rules drift from reality. goodbot tracks what your guardrails claim vs what the codebase actually looks like, and surfaces the gap — in your terminal, in PR comments, and via git hooks.
 
 ```
-$ goodbot analyze
+$ goodbot freshness
 
-✔ Analysis complete (203ms)
+Guardrail Freshness Report (generated 12 days ago)
+───────────────────────────────────────────────────────
+  Health grade             A → B+    ⚠ stale
+  Circular dependencies    0 → 2     ✗ degraded (+2)
+  Dead exports             0 → 3     ✗ degraded (+3)
+  Barrel violations        5 → 3     ↑ improved (-2)
 
-  Health Grade:  B+  (80/100)
+  8 fresh · 1 stale · 2 degraded · 1 improved
 
-  Dependencies     ███████░░░ 65
-  Stability        ██████████ 100
-  SOLID            █████████░ 91
-  Architecture     ███████░░░ 70
+✗ Your guardrails are stale. Run `goodbot generate --analyze --force` to update.
 ```
 
-One command generates all your agent files. One command grades your architecture. One command watches for violations in real-time.
+Two commands to get started. One command to check if your rules are still honest.
 
 ---
 
 ## Quick Start
 
 ```bash
-# Initialize goodbot in your project
+# Initialize and generate guardrails (auto-analyzes your codebase)
 npx goodbot-ai init
-
-# Generate all agent guardrail files
 npx goodbot-ai generate
+```
 
-# Analyze your architecture
-npx goodbot-ai analyze
+That's it. goodbot scans your project, runs a full analysis, and generates adaptive guardrail files tailored to your codebase. A snapshot is saved so you can track drift over time.
 
-# Watch for violations as you code
-npx goodbot-ai watch
+```bash
+# Later, check if your guardrails are still accurate
+npx goodbot-ai freshness
+
+# Install git hooks to catch staleness automatically
+npx goodbot-ai hooks install
+```
+
+Skip the interactive setup with a preset:
+
+```bash
+npx goodbot-ai init --preset recommended   # Balanced defaults
+npx goodbot-ai init --preset strict         # Maximum enforcement
+npx goodbot-ai init --preset relaxed        # Minimal guardrails
 ```
 
 Or install globally:
 
 ```bash
 npm install -g goodbot-ai
-goodbot init
-```
-
-Or skip the interactive flow entirely with a preset:
-
-```bash
-npx goodbot-ai init --preset recommended   # Balanced defaults
-npx goodbot-ai init --preset strict         # Maximum enforcement
-npx goodbot-ai init --preset relaxed        # Minimal guardrails
+goodbot init && goodbot generate
 ```
 
 ---
@@ -264,11 +270,25 @@ SOLID Analysis
 | **Circular Dependencies** | Finds cycles using Tarjan's strongly connected components algorithm |
 | **Layer Violations** | Validates imports flow downward only through your declared architecture layers |
 | **Barrel Violations** | Detects imports that bypass barrel files (e.g., `../services/orderService` instead of `../services`) |
+| **Cyclomatic Complexity** | Flags files with high branching complexity (if/else/switch/ternary density) |
+| **Code Duplication** | Detects copy-pasted code blocks across files using fingerprint hashing |
+| **Dead Exports** | Finds barrel exports that nothing imports — common in AI-generated code |
+| **God Modules** | Modules with excessive fan-in and fan-out (too many responsibilities) |
+| **Shallow Modules** | Wide interfaces with little implementation — re-export layers adding no value |
+
+With `--git`, also analyzes git history:
+
+| Analysis | What it does |
+|----------|-------------|
+| **Hotspot Detection** | Files that change frequently with high churn — risk areas for regressions |
+| **AI Commit Detection** | Classifies commits as AI vs human (Claude, Copilot, GPT, bot emails) |
+| **Temporal Coupling** | Files that always change together but aren't structurally connected — hidden dependencies |
 
 | Flag | Description |
 |------|-------------|
 | `--json` | Output full analysis as JSON for programmatic consumption |
 | `--diagram` | Generate `architecture.md` with mermaid dependency graph |
+| `--git` | Include git history analysis (hotspots, AI commits, temporal coupling) |
 | `--path <path>` | Analyze a specific project directory |
 
 ### `goodbot diff`
@@ -398,7 +418,7 @@ Guardrail Freshness Report (generated 12 days ago)
 ⚠ Run `goodbot generate --analyze --force` to update.
 ```
 
-Requires a snapshot from a previous `goodbot generate --analyze` run. Exits with code 1 if any claims are degraded — use it in CI to catch guardrail drift.
+Requires a snapshot (created automatically on first `goodbot generate`, or on any run with `--analyze`). Exits with code 1 if any claims are degraded — use it in CI to catch guardrail drift.
 
 | Flag | Description |
 |------|-------------|
@@ -538,6 +558,15 @@ Includes a stability metrics table and lists any circular dependencies or layer 
 | `AGENTS.md` | OpenAI Codex | Points to CODING_GUIDELINES.md |
 | `.cursorignore` | Cursor AI | Keeps build artifacts, secrets, and noise out of AI context |
 | `architecture.md` | All agents + humans | Mermaid dependency diagram (via `--diagram` flag) |
+
+goodbot also generates internal tracking files in `.goodbot/`:
+
+| File | Purpose |
+|------|---------|
+| `.goodbot/config.json` | Your single source of truth — all rules and settings |
+| `.goodbot/checksums.json` | Hashes of generated files (for drift detection via `check`) |
+| `.goodbot/snapshot.json` | Analysis snapshot (for freshness tracking via `freshness`) |
+| `.goodbot/history.json` | Health score history (for trend tracking via `trend`) |
 
 The key insight: **CODING_GUIDELINES.md is the single source of truth**. All agent-specific files simply point to it. This eliminates drift between agents and keeps maintenance to one file. The generated guidelines include SOLID principles tailored to your framework.
 

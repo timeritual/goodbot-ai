@@ -138,7 +138,7 @@ $ goodbot generate
 ✓ .cursorignore
 ```
 
-Use `--analyze` to generate **adaptive guardrails** — rules that reflect your actual codebase state, not just generic best practices:
+On first run, goodbot automatically analyzes your codebase and generates **adaptive guardrails** — rules that reflect your actual codebase state, not just generic best practices. Use `--analyze` on subsequent runs to refresh:
 
 ```
 $ goodbot generate --analyze
@@ -155,7 +155,7 @@ With `--analyze`, guardrails include your current health grade, specific violati
 
 | Flag | Description |
 |------|-------------|
-| `--analyze` | Run analysis first and generate adaptive guardrails based on findings |
+| `--analyze` | Re-run analysis and refresh adaptive guardrails (automatic on first run) |
 | `--dry-run` | Preview what would be generated without writing |
 | `--force` | Overwrite existing files without prompting |
 
@@ -827,7 +827,7 @@ goodbot hooks install
 | Command | Description |
 |---------|-------------|
 | `goodbot init` | Interactive project setup (or `--preset strict\|recommended\|relaxed`) |
-| `goodbot generate` | Generate AI agent guardrail files (`--analyze` for adaptive guardrails) |
+| `goodbot generate` | Generate AI agent guardrail files (auto-analyzes on first run) |
 | `goodbot check` | Detect drift in generated files + snapshot age |
 | `goodbot freshness` | Compare guardrail claims against current codebase reality |
 | `goodbot hooks` | Install/uninstall git hooks for automatic freshness checks |

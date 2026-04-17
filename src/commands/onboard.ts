@@ -6,7 +6,7 @@ import { runFullAnalysis } from '../analyzers/index.js';
 import { loadConfig, type GoodbotConfig } from '../config/index.js';
 import { log, safeWriteFile } from '../utils/index.js';
 import type { FullAnalysis } from '../analyzers/index.js';
-import type { ScanResult } from '../scanners/index.js';
+import type { ScanResult, DetectedLayer } from '../scanners/index.js';
 
 export const onboardCommand = new Command('onboard')
   .description('Generate a new developer onboarding guide for your project')
@@ -86,33 +86,12 @@ function generateOnboardingGuide(
     lines.push('```');
     lines.push('');
 
-    // Module descriptions
-    lines.push('### What Each Module Does');
+    // Module descriptions — derived from analysis data
+    lines.push('### Modules');
     lines.push('');
 
-    const moduleDescriptions: Record<string, string> = {
-      types: 'Pure type definitions. No runtime code. The foundation everything depends on.',
-      constants: 'Static configuration values, magic numbers, enums. No logic.',
-      config: 'Environment configuration, API URLs, feature flags.',
-      utils: 'Shared utilities — storage helpers, error handling, device detection.',
-      api: 'HTTP clients, API request/response handling, token management.',
-      services: 'Business logic — data transformation, validation, caching, API orchestration.',
-      hooks: 'React hooks — thin wrappers that call services and manage UI state.',
-      contexts: 'React context providers — global state management.',
-      components: 'Reusable UI components — buttons, inputs, modals, layouts.',
-      screens: 'Screen-level components — compose other components, handle navigation.',
-      navigation: 'Routing and navigation configuration.',
-      features: 'Feature modules — self-contained slices of functionality.',
-      lib: 'Shared library code used across the application.',
-      stores: 'State management stores (Redux, Zustand, etc.).',
-      pages: 'Page-level components (Next.js pages or similar).',
-      routes: 'API route handlers.',
-      middleware: 'Request/response middleware.',
-      controllers: 'Request handlers (MVC pattern).',
-    };
-
     for (const layer of scan.structure.detectedLayers) {
-      const desc = moduleDescriptions[layer.name] ?? `${layer.name} module.`;
+      const desc = describeModule(layer, dep, analysis);
       lines.push(`- **${layer.name}/** — ${desc}`);
     }
     lines.push('');
@@ -185,8 +164,20 @@ function generateOnboardingGuide(
   lines.push(`| Architecture | ${health.breakdown.architecture}/100 |`);
   lines.push('');
 
+  // Known issues
+  const issues: string[] = [];
   if (dep.circularDependencies.length > 0) {
-    lines.push(`> **Known issues:** ${dep.circularDependencies.length} circular dependencies. Run \`goodbot analyze\` for details.`);
+    issues.push(`${dep.circularDependencies.length} circular dependenc${dep.circularDependencies.length === 1 ? 'y' : 'ies'}`);
+  }
+  if (dep.layerViolations.length > 0) {
+    issues.push(`${dep.layerViolations.length} layer violation${dep.layerViolations.length === 1 ? '' : 's'}`);
+  }
+  const solidErrors = analysis.solid.violations.filter(v => v.severity === 'error').length;
+  if (solidErrors > 0) {
+    issues.push(`${solidErrors} SOLID violation${solidErrors === 1 ? '' : 's'}`);
+  }
+  if (issues.length > 0) {
+    lines.push(`> **Known issues:** ${issues.join(', ')}. Run \`goodbot analyze\` for details.`);
     lines.push('');
   }
 
@@ -214,4 +205,65 @@ function generateOnboardingGuide(
   lines.push('');
 
   return lines.join('\n');
+}
+
+/**
+ * Derive a module description from analysis data rather than using hardcoded strings.
+ * Looks at file count, dependency relationships, stability, and role in the graph.
+ */
+export function describeModule(
+  layer: DetectedLayer,
+  dep: FullAnalysis['dependency'],
+  analysis: FullAnalysis,
+): string {
+  const mod = dep.modules.find(m => m.name === layer.name);
+  if (!mod) return `${layer.name} module.`;
+
+  const parts: string[] = [];
+
+  // File count
+  parts.push(`${mod.fileCount} file${mod.fileCount === 1 ? '' : 's'}`);
+
+  // Stability characterization
+  const stability = dep.stability.find(s => s.moduleName === layer.name);
+  if (stability) {
+    if (stability.instability <= 0.2 && stability.afferentCoupling > 0) {
+      parts.push('highly stable (many dependents)');
+    } else if (stability.instability >= 0.8 && stability.efferentCoupling > 0) {
+      parts.push('volatile (depends on many modules)');
+    }
+  }
+
+  // Dependency direction
+  const dependsOn = Array.from(mod.dependsOn);
+  const dependedOnBy = Array.from(mod.dependedOnBy);
+
+  if (dependedOnBy.length > 0 && dependsOn.length === 0) {
+    parts.push('foundation layer — imported by ' + formatModuleList(dependedOnBy));
+  } else if (dependsOn.length > 0 && dependedOnBy.length === 0) {
+    parts.push('leaf layer — imports from ' + formatModuleList(dependsOn));
+  } else if (dependsOn.length > 0 && dependedOnBy.length > 0) {
+    parts.push(`imports from ${formatModuleList(dependsOn)}, used by ${formatModuleList(dependedOnBy)}`);
+  }
+
+  // Barrel status
+  if (layer.hasBarrel) {
+    parts.push('has barrel (import from index)');
+  }
+
+  // Violations in this module
+  const moduleViolations = analysis.solid.violations.filter(
+    v => v.file.startsWith(layer.path + '/') || v.file.startsWith(layer.name + '/'),
+  );
+  const errorCount = moduleViolations.filter(v => v.severity === 'error').length;
+  if (errorCount > 0) {
+    parts.push(`${errorCount} issue${errorCount === 1 ? '' : 's'} to address`);
+  }
+
+  return parts.join('. ') + '.';
+}
+
+function formatModuleList(modules: string[]): string {
+  if (modules.length <= 3) return modules.join(', ');
+  return `${modules.slice(0, 3).join(', ')} and ${modules.length - 3} more`;
 }

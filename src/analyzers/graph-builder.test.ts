@@ -11,8 +11,8 @@ function makeFileImport(filePath: string, moduleName: string, targets: Array<{ s
       resolvedPath: t.resolvedPath,
       line: 1,
       kind: 'import' as const,
-      _targetModule: t.targetModule,
-    })) as FileImports['imports'],
+      targetModule: t.targetModule,
+    })),
   };
 }
 

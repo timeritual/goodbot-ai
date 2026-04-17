@@ -4,9 +4,9 @@ export interface CustomRule {
   name: string;
   description?: string;
   pattern: string;          // regex to match import specifiers
-  forbidden_in?: string[];  // glob patterns for files where this import is forbidden
-  required_in?: string[];   // glob patterns for files where this import is required
-  max_imports?: number;     // max number of cross-module imports allowed in matching files
+  forbiddenIn?: string[];   // glob patterns for files where this import is forbidden
+  requiredIn?: string[];    // glob patterns for files where this import is required
+  maxImports?: number;      // max number of cross-module imports allowed in matching files
   severity?: 'info' | 'warning' | 'error';
 }
 
@@ -21,15 +21,15 @@ export function checkCustomRules(
   for (const rule of rules) {
     const regex = new RegExp(rule.pattern);
 
-    // Check forbidden_in: files matching glob must NOT have imports matching pattern
-    if (rule.forbidden_in) {
+    // Check forbiddenIn: files matching glob must NOT have imports matching pattern
+    if (rule.forbiddenIn) {
       for (const fi of fileImports) {
-        if (!matchesAnyGlob(fi.filePath, rule.forbidden_in)) continue;
+        if (!matchesAnyGlob(fi.filePath, rule.forbiddenIn)) continue;
 
         for (const imp of fi.imports) {
           if (regex.test(imp.specifier)) {
             violations.push({
-              principle: 'SRP', // Custom rules map to closest SOLID principle
+              principle: 'CUSTOM',
               severity: rule.severity ?? 'warning',
               file: fi.filePath,
               line: imp.line,
@@ -41,34 +41,34 @@ export function checkCustomRules(
       }
     }
 
-    // Check max_imports: files matching patterns can't have more than N cross-module imports
-    if (rule.max_imports !== undefined) {
+    // Check maxImports: files matching patterns can't have more than N cross-module imports
+    if (rule.maxImports !== undefined) {
       for (const fi of fileImports) {
-        if (rule.forbidden_in && !matchesAnyGlob(fi.filePath, rule.forbidden_in)) continue;
-        if (rule.required_in && !matchesAnyGlob(fi.filePath, rule.required_in)) continue;
+        if (rule.forbiddenIn && !matchesAnyGlob(fi.filePath, rule.forbiddenIn)) continue;
+        if (rule.requiredIn && !matchesAnyGlob(fi.filePath, rule.requiredIn)) continue;
 
         const matchingImports = fi.imports.filter((imp) => regex.test(imp.specifier));
-        if (matchingImports.length > rule.max_imports) {
+        if (matchingImports.length > rule.maxImports) {
           violations.push({
-            principle: 'SRP',
+            principle: 'CUSTOM',
             severity: rule.severity ?? 'warning',
             file: fi.filePath,
-            message: `[${rule.name}] ${matchingImports.length} imports matching pattern (max: ${rule.max_imports})`,
-            suggestion: rule.description ?? `Reduce imports to stay under ${rule.max_imports}`,
+            message: `[${rule.name}] ${matchingImports.length} imports matching pattern (max: ${rule.maxImports})`,
+            suggestion: rule.description ?? `Reduce imports to stay under ${rule.maxImports}`,
           });
         }
       }
     }
 
-    // Check required_in: files matching glob MUST have at least one import matching pattern
-    if (rule.required_in && !rule.max_imports) {
+    // Check requiredIn: files matching glob MUST have at least one import matching pattern
+    if (rule.requiredIn && !rule.maxImports) {
       for (const fi of fileImports) {
-        if (!matchesAnyGlob(fi.filePath, rule.required_in)) continue;
+        if (!matchesAnyGlob(fi.filePath, rule.requiredIn)) continue;
 
         const hasMatch = fi.imports.some((imp) => regex.test(imp.specifier));
         if (!hasMatch) {
           violations.push({
-            principle: 'DIP',
+            principle: 'CUSTOM',
             severity: rule.severity ?? 'info',
             file: fi.filePath,
             message: `[${rule.name}] Expected import matching '${rule.pattern}' not found`,

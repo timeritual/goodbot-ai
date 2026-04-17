@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildSnapshot } from './snapshot.js';
-import type { AnalysisInsights } from '../generators/types.js';
+import type { AnalysisInsights } from '../generators/index.js';
 
 function makeInsights(overrides: Partial<AnalysisInsights> = {}): AnalysisInsights {
   return {

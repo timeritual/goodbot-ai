@@ -11,15 +11,11 @@ const CONFIG_FILE = 'config.json';
 const CHECKSUMS_FILE = 'checksums.json';
 const SNAPSHOT_FILE = 'snapshot.json';
 
-export function configDir(projectRoot: string): string {
-  return path.join(projectRoot, CONFIG_DIR);
-}
-
-export function configPath(projectRoot: string): string {
+function configPath(projectRoot: string): string {
   return path.join(projectRoot, CONFIG_DIR, CONFIG_FILE);
 }
 
-export function checksumsPath(projectRoot: string): string {
+function checksumsPath(projectRoot: string): string {
   return path.join(projectRoot, CONFIG_DIR, CHECKSUMS_FILE);
 }
 

@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import ora from 'ora';
-import { loadConfig, saveConfig, type GoodbotConfig } from '../config/index.js';
+import chalk from 'chalk';
+import { loadConfig, saveConfig, GoodbotConfigSchema, type GoodbotConfig } from '../config/index.js';
 import { log, safeReadFile, safeWriteFile } from '../utils/index.js';
 
 export const syncCommand = new Command('sync')
@@ -39,13 +40,18 @@ async function pullConfig(projectRoot: string, source?: string): Promise<void> {
     process.exit(1);
   }
 
+  // Security: only allow HTTPS for remote URLs
+  if (syncUrl.startsWith('http://')) {
+    log.error('HTTP URLs are not supported for security reasons. Use HTTPS instead.');
+    process.exit(1);
+  }
+
   const spinner = ora(`Fetching config from ${syncUrl}...`).start();
 
   try {
     let remoteContent: string | null = null;
 
-    if (syncUrl.startsWith('http://') || syncUrl.startsWith('https://')) {
-      // Fetch from URL
+    if (syncUrl.startsWith('https://')) {
       const response = await fetch(syncUrl);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -60,7 +66,23 @@ async function pullConfig(projectRoot: string, source?: string): Promise<void> {
       throw new Error(`Could not read config from ${syncUrl}`);
     }
 
-    const remoteConfig = JSON.parse(remoteContent) as GoodbotConfig;
+    // Parse and validate through Zod schema
+    let rawConfig: unknown;
+    try {
+      rawConfig = JSON.parse(remoteContent);
+    } catch {
+      throw new Error('Remote config is not valid JSON.');
+    }
+
+    const parseResult = GoodbotConfigSchema.safeParse(rawConfig);
+    if (!parseResult.success) {
+      const issues = parseResult.error.issues.slice(0, 5)
+        .map(i => `  ${i.path.join('.')}: ${i.message}`)
+        .join('\n');
+      throw new Error(`Remote config failed schema validation:\n${issues}`);
+    }
+
+    const remoteConfig = parseResult.data;
 
     // Merge: remote config is the base, local project/verification are preserved
     let localConfig: GoodbotConfig | null = null;
@@ -80,9 +102,26 @@ async function pullConfig(projectRoot: string, source?: string): Promise<void> {
       team: { ...remoteConfig.team, syncUrl },
     };
 
-    await saveConfig(projectRoot, merged);
     spinner.succeed('Config synced');
 
+    // Show what changed
+    if (localConfig) {
+      const changes = diffConfigs(localConfig, merged);
+      if (changes.length > 0) {
+        console.log();
+        log.header('Changes Applied');
+        console.log(chalk.dim('─'.repeat(50)));
+        for (const change of changes) {
+          console.log(`  ${chalk.yellow('~')} ${change}`);
+        }
+      } else {
+        log.dim('No changes — local config already matches remote.');
+      }
+    }
+
+    await saveConfig(projectRoot, merged);
+
+    console.log();
     log.success('Merged team config with local settings.');
     log.dim('Team rules, architecture, and custom rules updated from shared source.');
     log.dim('Local project name and verification commands preserved.');
@@ -91,6 +130,48 @@ async function pullConfig(projectRoot: string, source?: string): Promise<void> {
     log.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
   }
+}
+
+export function diffConfigs(local: GoodbotConfig, merged: GoodbotConfig): string[] {
+  const changes: string[] = [];
+
+  // Architecture
+  if (local.architecture.barrelImportRule !== merged.architecture.barrelImportRule) {
+    changes.push(`barrelImportRule: ${local.architecture.barrelImportRule} → ${merged.architecture.barrelImportRule}`);
+  }
+  if (local.architecture.interfaceContracts !== merged.architecture.interfaceContracts) {
+    changes.push(`interfaceContracts: ${local.architecture.interfaceContracts} → ${merged.architecture.interfaceContracts}`);
+  }
+  if (local.architecture.layers.length !== merged.architecture.layers.length) {
+    changes.push(`layers: ${local.architecture.layers.length} → ${merged.architecture.layers.length}`);
+  }
+
+  // Business logic
+  const localAllowed = local.businessLogic.allowedIn.join(', ');
+  const mergedAllowed = merged.businessLogic.allowedIn.join(', ');
+  if (localAllowed !== mergedAllowed) {
+    changes.push(`businessLogic.allowedIn: [${localAllowed}] → [${mergedAllowed}]`);
+  }
+
+  // Custom rules
+  if (local.conventions.customRules.length !== merged.conventions.customRules.length) {
+    changes.push(`customRules: ${local.conventions.customRules.length} → ${merged.conventions.customRules.length}`);
+  }
+  if ((local.customRulesConfig?.length ?? 0) !== (merged.customRulesConfig?.length ?? 0)) {
+    changes.push(`customRulesConfig: ${local.customRulesConfig?.length ?? 0} → ${merged.customRulesConfig?.length ?? 0}`);
+  }
+
+  // Analysis thresholds
+  if (local.analysis.thresholds.maxFileLines !== merged.analysis.thresholds.maxFileLines) {
+    changes.push(`maxFileLines: ${local.analysis.thresholds.maxFileLines} → ${merged.analysis.thresholds.maxFileLines}`);
+  }
+
+  // Ignore
+  if (local.ignore.paths.length !== merged.ignore.paths.length) {
+    changes.push(`ignore.paths: ${local.ignore.paths.length} → ${merged.ignore.paths.length}`);
+  }
+
+  return changes;
 }
 
 async function pushConfig(projectRoot: string, destination?: string): Promise<void> {

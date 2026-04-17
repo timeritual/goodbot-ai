@@ -77,6 +77,6 @@ runs:
       if: ${{ inputs.fail-on-grade != '' }}
       shell: bash
       run: |
-        GRADE=$(cat /tmp/goodbot-result.json | python3 -c "import json,sys; print(json.load(sys.stdin)['health']['grade'])")
+        GRADE=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/goodbot-result.json','utf-8')).health.grade)")
         THRESHOLD="${{ inputs.fail-on-grade }}"
         npx goodbot-ai ci --check-grade "$GRADE" --threshold "$THRESHOLD"

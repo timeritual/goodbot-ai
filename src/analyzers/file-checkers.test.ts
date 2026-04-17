@@ -62,16 +62,12 @@ describe('checkSRP', () => {
   });
 
   it('flags files importing from 4+ modules', async () => {
-    const imports = [
-      { specifier: '../a', resolvedPath: null, line: 1, kind: 'import' as const },
-      { specifier: '../b', resolvedPath: null, line: 2, kind: 'import' as const },
-      { specifier: '../c', resolvedPath: null, line: 3, kind: 'import' as const },
-      { specifier: '../d', resolvedPath: null, line: 4, kind: 'import' as const },
+    const imports: FileImports['imports'] = [
+      { specifier: '../a', resolvedPath: null, line: 1, kind: 'import' as const, targetModule: 'a' },
+      { specifier: '../b', resolvedPath: null, line: 2, kind: 'import' as const, targetModule: 'b' },
+      { specifier: '../c', resolvedPath: null, line: 3, kind: 'import' as const, targetModule: 'c' },
+      { specifier: '../d', resolvedPath: null, line: 4, kind: 'import' as const, targetModule: 'd' },
     ];
-    // Attach _targetModule at runtime like the orchestrator does
-    for (const [i, name] of ['a', 'b', 'c', 'd'].entries()) {
-      (imports[i] as { _targetModule?: string })._targetModule = name;
-    }
     const fileImports: FileImports[] = [{
       filePath: 'src/mixed.ts',
       moduleName: 'app',

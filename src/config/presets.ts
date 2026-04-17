@@ -62,6 +62,7 @@ export function buildPresetConfig(
     analysis: {
       solid: true,
       thresholds: { maxFileLines: 300, maxBarrelExports: 15, maxModuleCoupling: 8 },
+      budget: {},
     },
     customRulesConfig: [],
     team: {},

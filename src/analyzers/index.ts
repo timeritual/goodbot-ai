@@ -8,6 +8,8 @@ import type {
 import { DEFAULT_THRESHOLDS } from './types.js';
 import { parseFileImports } from './import-parser.js';
 import { collectSourceFiles, getModuleName, resolveImportPath } from './module-resolver.js';
+
+export { collectSourceFiles } from './module-resolver.js';
 import { buildDependencyGraph } from './graph-builder.js';
 import { calculateStability, findStabilityViolations } from './stability.js';
 import { findCircularDependencies } from './cycles.js';
@@ -18,34 +20,32 @@ import { calculateHealthScore } from './health-score.js';
 import { loadIgnoreRules, filterSolidViolations, filterLayerViolations, filterBarrelViolations } from './ignore.js';
 import { checkCustomRules } from './custom-rules.js';
 
-export type { DependencyAnalysis, DependencyAnalysisSummary, FullAnalysis, SolidAnalysis, HealthScore, HealthGrade } from './types.js';
+export type { DependencyAnalysis, DependencyAnalysisSummary, FullAnalysis, SolidAnalysis, HealthScore, HealthGrade, BarrelViolation } from './types.js';
 export { analyzeGitHistory, type GitHistoryAnalysis, type FileHotspot, type GitCommit } from './git-history.js';
 export { findTemporalCoupling, type TemporalCoupling } from './temporal-coupling.js';
+export { checkDeadExports, type DeadExportResult } from './dead-export-checker.js';
 
 const BATCH_SIZE = 50;
 
-export async function runDependencyAnalysis(
+// ─── Shared Import Parsing Pipeline ──────────────────────
+
+interface ParsedImportData {
+  allFileImports: FileImports[];
+  sourceFiles: string[];
+  srcRootAbsolute: string;
+}
+
+async function parseAndResolveImports(
   projectRoot: string,
-  structure: StructureAnalysis,
-  config?: GoodbotConfig,
-): Promise<DependencyAnalysis> {
-  const startTime = Date.now();
-
-  if (!structure.srcRoot) {
-    return emptyAnalysis(0);
-  }
-
-  const srcRootAbsolute = path.resolve(projectRoot, structure.srcRoot);
-
-  // 1. Collect source files
+  srcRootAbsolute: string,
+): Promise<ParsedImportData> {
   const sourceFiles = await collectSourceFiles(srcRootAbsolute);
   if (sourceFiles.length === 0) {
-    return emptyAnalysis(0);
+    return { allFileImports: [], sourceFiles, srcRootAbsolute };
   }
 
-  // 2. Parse imports from all files (batched)
+  // Parse imports from all files (batched)
   const allFileImports: FileImports[] = [];
-
   for (let i = 0; i < sourceFiles.length; i += BATCH_SIZE) {
     const batch = sourceFiles.slice(i, i + BATCH_SIZE);
     const results = await Promise.all(
@@ -58,7 +58,7 @@ export async function runDependencyAnalysis(
     allFileImports.push(...results);
   }
 
-  // 3. Resolve import paths and assign target modules
+  // Resolve import paths and assign target modules
   for (const fi of allFileImports) {
     const fileAbsolute = path.resolve(projectRoot, fi.filePath);
     const fileDir = path.dirname(fileAbsolute);
@@ -68,14 +68,21 @@ export async function runDependencyAnalysis(
       imp.resolvedPath = resolved ? path.relative(projectRoot, resolved) : null;
 
       if (resolved) {
-        const targetModule = getModuleName(resolved, srcRootAbsolute);
-        // Attach target module to import for use by analyzers
-        (imp as { _targetModule?: string })._targetModule = targetModule;
+        imp.targetModule = getModuleName(resolved, srcRootAbsolute);
       }
     }
   }
 
-  // 4. Build dependency graph
+  return { allFileImports, sourceFiles, srcRootAbsolute };
+}
+
+function buildDependencyAnalysis(
+  allFileImports: FileImports[],
+  sourceFiles: string[],
+  structure: StructureAnalysis,
+  srcRootAbsolute: string,
+  config?: GoodbotConfig,
+): DependencyAnalysis & { _startTime?: never } {
   const { modules, edges } = buildDependencyGraph(allFileImports);
 
   // Enrich module paths from detected layers
@@ -84,7 +91,6 @@ export async function runDependencyAnalysis(
     mod.path = layerPaths.get(mod.name) ?? mod.name;
   }
 
-  // 5. Run analyses
   const stability = calculateStability(modules);
   const stabilityViolations = findStabilityViolations(stability, edges);
   const circularDependencies = findCircularDependencies(modules, edges);
@@ -104,16 +110,36 @@ export async function runDependencyAnalysis(
     : [];
 
   return {
-    modules,
-    edges,
-    stability,
-    stabilityViolations,
-    circularDependencies,
-    barrelViolations,
-    layerViolations,
+    modules, edges, stability, stabilityViolations,
+    circularDependencies, barrelViolations, layerViolations,
     filesParsed: sourceFiles.length,
-    timeTakenMs: Date.now() - startTime,
+    timeTakenMs: 0,
   };
+}
+
+// ─── Public API ──────────────────────────────────────────
+
+export async function runDependencyAnalysis(
+  projectRoot: string,
+  structure: StructureAnalysis,
+  config?: GoodbotConfig,
+): Promise<DependencyAnalysis> {
+  const startTime = Date.now();
+
+  if (!structure.srcRoot) {
+    return emptyAnalysis(0);
+  }
+
+  const srcRootAbsolute = path.resolve(projectRoot, structure.srcRoot);
+  const { allFileImports, sourceFiles } = await parseAndResolveImports(projectRoot, srcRootAbsolute);
+
+  if (sourceFiles.length === 0) {
+    return emptyAnalysis(0);
+  }
+
+  const dep = buildDependencyAnalysis(allFileImports, sourceFiles, structure, srcRootAbsolute, config);
+  dep.timeTakenMs = Date.now() - startTime;
+  return dep;
 }
 
 export function summarizeAnalysis(analysis: DependencyAnalysis): DependencyAnalysisSummary {
@@ -158,7 +184,7 @@ export async function runFullAnalysis(
   }
 
   const srcRootAbsolute = path.resolve(projectRoot, structure.srcRoot);
-  const sourceFiles = await collectSourceFiles(srcRootAbsolute);
+  const { allFileImports, sourceFiles } = await parseAndResolveImports(projectRoot, srcRootAbsolute);
 
   if (sourceFiles.length === 0) {
     const dep = emptyAnalysis(0);
@@ -167,76 +193,21 @@ export async function runFullAnalysis(
     return { dependency: dep, solid, health };
   }
 
-  // Parse all imports
-  const allFileImports: FileImports[] = [];
-  for (let i = 0; i < sourceFiles.length; i += BATCH_SIZE) {
-    const batch = sourceFiles.slice(i, i + BATCH_SIZE);
-    const results = await Promise.all(
-      batch.map(async (filePath) => {
-        const imports = await parseFileImports(filePath);
-        const moduleName = getModuleName(filePath, srcRootAbsolute);
-        return { filePath: path.relative(projectRoot, filePath), moduleName, imports };
-      }),
-    );
-    allFileImports.push(...results);
-  }
-
-  // Resolve imports
-  for (const fi of allFileImports) {
-    const fileAbsolute = path.resolve(projectRoot, fi.filePath);
-    const fileDir = path.dirname(fileAbsolute);
-    for (const imp of fi.imports) {
-      const resolved = await resolveImportPath(imp.specifier, fileDir);
-      imp.resolvedPath = resolved ? path.relative(projectRoot, resolved) : null;
-      if (resolved) {
-        (imp as { _targetModule?: string })._targetModule = getModuleName(resolved, srcRootAbsolute);
-      }
-    }
-  }
-
   // Dependency analysis
-  const { modules, edges } = buildDependencyGraph(allFileImports);
-  const layerPaths = new Map(structure.detectedLayers.map((l) => [l.name, l.path]));
-  for (const mod of modules) {
-    mod.path = layerPaths.get(mod.name) ?? mod.name;
-  }
-
-  const stability = calculateStability(modules);
-  const stabilityViolations = findStabilityViolations(stability, edges);
-  const circularDependencies = findCircularDependencies(modules, edges);
-
-  const layers: Array<{ name: string; level: number }> = config?.architecture.layers.length
-    ? config.architecture.layers
-    : structure.detectedLayers.map((l) => ({ name: l.name, level: l.suggestedLevel }));
-
-  const barrelViolations =
-    (config?.architecture.barrelImportRule === 'always' || structure.hasBarrelFiles)
-      ? findBarrelViolations(allFileImports, structure.detectedLayers, srcRootAbsolute)
-      : [];
-
-  const layerViolations = layers.length > 0
-    ? findLayerViolations(allFileImports, layers)
-    : [];
-
-  const dep: DependencyAnalysis = {
-    modules, edges, stability, stabilityViolations,
-    circularDependencies, barrelViolations, layerViolations,
-    filesParsed: sourceFiles.length,
-    timeTakenMs: Date.now() - startTime,
-  };
+  const dep = buildDependencyAnalysis(allFileImports, sourceFiles, structure, srcRootAbsolute, config);
 
   // SOLID analysis
   const thresholds: AnalysisThresholds = config
-    ? { ...DEFAULT_THRESHOLDS, ...(config as { analysis?: { thresholds?: Partial<AnalysisThresholds> } }).analysis?.thresholds }
+    ? { ...DEFAULT_THRESHOLDS, ...config.analysis?.thresholds }
     : DEFAULT_THRESHOLDS;
 
   const solid = await runSolidAnalysis(
     allFileImports, sourceFiles, structure.detectedLayers,
-    projectRoot, srcRootAbsolute, thresholds, modules,
+    projectRoot, srcRootAbsolute, thresholds, dep.modules,
   );
 
   // Custom rules
-  const customRules = (config as { customRulesConfig?: Array<{ name: string; pattern: string; description?: string; forbidden_in?: string[]; required_in?: string[]; max_imports?: number; severity?: 'info' | 'warning' | 'error' }> })?.customRulesConfig ?? [];
+  const customRules = config?.customRulesConfig ?? [];
   if (customRules.length > 0) {
     const customViolations = checkCustomRules(allFileImports, customRules);
     solid.violations.push(...customViolations);

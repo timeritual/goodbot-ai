@@ -11,8 +11,8 @@ function makeImport(filePath: string, moduleName: string, targets: Array<{ speci
       resolvedPath: `src/${t.targetModule}/index.ts`,
       line: t.line,
       kind: 'import' as const,
-      _targetModule: t.targetModule,
-    })) as FileImports['imports'],
+      targetModule: t.targetModule,
+    })),
   };
 }
 

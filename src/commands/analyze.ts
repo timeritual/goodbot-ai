@@ -9,6 +9,7 @@ import { loadConfig } from '../config/index.js';
 import { log, safeWriteFile } from '../utils/index.js';
 import type { DependencyAnalysis, FullAnalysis, HealthScore, SolidAnalysis, GitHistoryAnalysis, TemporalCoupling } from '../analyzers/index.js';
 import { analyzeGitHistory, findTemporalCoupling } from '../analyzers/index.js';
+import type { GoodbotConfig } from '../config/index.js';
 
 export const analyzeCommand = new Command('analyze')
   .description('Run deep dependency and SOLID analysis on your project')
@@ -74,7 +75,7 @@ export const analyzeCommand = new Command('analyze')
         renderTemporalCoupling(temporalCouplings);
       }
 
-      renderFinalSummary(result);
+      renderFinalSummary(result, config);
 
       if (opts.diagram) {
         const diagramPath = path.join(projectRoot, 'architecture.md');
@@ -198,6 +199,10 @@ export function renderDependencyAnalysis(analysis: DependencyAnalysis): void {
 // ─── SOLID Analysis ───────────────────────────────────────
 
 export function renderSolidAnalysis(solid: SolidAnalysis): void {
+  // Separate custom rule violations from SOLID violations
+  const solidViolations = solid.violations.filter((v) => v.principle !== 'CUSTOM');
+  const customViolations = solid.violations.filter((v) => v.principle === 'CUSTOM');
+
   log.header('SOLID Analysis');
   console.log(chalk.dim('─'.repeat(50)));
 
@@ -212,10 +217,10 @@ export function renderSolidAnalysis(solid: SolidAnalysis): void {
   console.log(`  ${chalk.dim('DIP (Dependency Inversion)'.padEnd(32))} ${bar(solid.scores.dip)} ${chalk.dim(String(solid.scores.dip))}`);
   console.log(`  ${chalk.dim('ISP (Interface Segregation)'.padEnd(32))} ${bar(solid.scores.isp)} ${chalk.dim(String(solid.scores.isp))}`);
 
-  if (solid.violations.length > 0) {
+  if (solidViolations.length > 0) {
     console.log();
-    const errors = solid.violations.filter((v) => v.severity === 'error');
-    const warnings = solid.violations.filter((v) => v.severity === 'warning');
+    const errors = solidViolations.filter((v) => v.severity === 'error');
+    const warnings = solidViolations.filter((v) => v.severity === 'warning');
 
     if (errors.length > 0) {
       for (const v of errors.slice(0, 8)) {
@@ -232,9 +237,40 @@ export function renderSolidAnalysis(solid: SolidAnalysis): void {
       }
     }
 
-    const remaining = solid.violations.length - Math.min(errors.length, 8) - Math.min(warnings.length, 15);
+    const remaining = solidViolations.length - Math.min(errors.length, 8) - Math.min(warnings.length, 15);
     if (remaining > 0) {
       log.dim(`  ... and ${remaining} more`);
+    }
+  }
+
+  // Custom Rules — separate section
+  if (customViolations.length > 0) {
+    log.header(`Custom Rules (${customViolations.length})`);
+    console.log(chalk.dim('─'.repeat(50)));
+
+    const customErrors = customViolations.filter((v) => v.severity === 'error');
+    const customWarnings = customViolations.filter((v) => v.severity === 'warning');
+    const customInfos = customViolations.filter((v) => v.severity === 'info');
+
+    for (const v of customErrors.slice(0, 8)) {
+      console.log(`  ${chalk.red('✗')} ${v.message}`);
+      console.log(chalk.dim(`    ${v.file}`));
+      console.log(chalk.green(`    → ${v.suggestion}`));
+    }
+
+    for (const v of customWarnings.slice(0, 10)) {
+      console.log(`  ${chalk.yellow('⚠')} ${v.message}`);
+      console.log(chalk.dim(`    ${v.file}`));
+    }
+
+    for (const v of customInfos.slice(0, 5)) {
+      console.log(`  ${chalk.dim('ℹ')} ${v.message}`);
+      console.log(chalk.dim(`    ${v.file}`));
+    }
+
+    const shown = Math.min(customErrors.length, 8) + Math.min(customWarnings.length, 10) + Math.min(customInfos.length, 5);
+    if (customViolations.length > shown) {
+      log.dim(`  ... and ${customViolations.length - shown} more`);
     }
   }
 }
@@ -289,7 +325,7 @@ function renderTemporalCoupling(couplings: TemporalCoupling[]): void {
 
 // ─── Final Summary ────────────────────────────────────────
 
-function renderFinalSummary(result: FullAnalysis): void {
+function renderFinalSummary(result: FullAnalysis, config?: GoodbotConfig): void {
   const dep = result.dependency;
   const totalIssues =
     dep.circularDependencies.length +
@@ -303,6 +339,71 @@ function renderFinalSummary(result: FullAnalysis): void {
     log.success('No architectural violations found.');
   } else {
     log.warn(`${totalIssues} issue${totalIssues > 1 ? 's' : ''} found.`);
+  }
+
+  // Budget check
+  if (config) {
+    const budgetResult = checkBudget(result, config);
+    if (budgetResult.length > 0) {
+      renderBudgetResult(budgetResult);
+    }
+  }
+}
+
+// ─── Violation Budget ────────────────────────────────────
+
+export interface BudgetEntry {
+  category: string;
+  actual: number;
+  budget: number;
+  overBudget: boolean;
+}
+
+export function checkBudget(result: FullAnalysis, config: GoodbotConfig): BudgetEntry[] {
+  const budget = config.analysis?.budget;
+  if (!budget) return [];
+
+  const entries: BudgetEntry[] = [];
+  const dep = result.dependency;
+  const solid = result.solid.violations;
+
+  const check = (category: string, actual: number, limit: number | undefined) => {
+    if (limit === undefined) return;
+    entries.push({ category, actual, budget: limit, overBudget: actual > limit });
+  };
+
+  check('Circular dependencies', dep.circularDependencies.length, budget.circular);
+  check('Layer violations', dep.layerViolations.length, budget.layer);
+  check('Barrel violations', dep.barrelViolations.length, budget.barrel);
+  check('SRP violations', solid.filter(v => v.principle === 'SRP' && v.severity !== 'info').length, budget.srp);
+  check('Complexity issues', solid.filter(v => v.message.includes('complexity') || v.message.includes('Complexity')).length, budget.complexity);
+  check('Duplication clusters', solid.filter(v => v.message.includes('duplicat')).length, budget.duplication);
+  check('Dead exports', solid.filter(v => v.message.includes('Dead export')).length, budget.deadExports);
+  check('Custom rule violations', solid.filter(v => v.principle === 'CUSTOM').length, budget.custom);
+
+  return entries;
+}
+
+function renderBudgetResult(entries: BudgetEntry[]): void {
+  const hasOverBudget = entries.some(e => e.overBudget);
+
+  console.log();
+  log.header('Violation Budget');
+  console.log(chalk.dim('─'.repeat(50)));
+
+  for (const entry of entries) {
+    const status = entry.overBudget
+      ? chalk.red(`${entry.actual}/${entry.budget} ✗ over budget`)
+      : chalk.green(`${entry.actual}/${entry.budget} ✓ within budget`);
+    console.log(`  ${entry.category.padEnd(24)} ${status}`);
+  }
+
+  console.log();
+  if (hasOverBudget) {
+    const overCount = entries.filter(e => e.overBudget).length;
+    log.error(`${overCount} categor${overCount === 1 ? 'y' : 'ies'} over budget.`);
+  } else {
+    log.success('All categories within budget.');
   }
 }
 

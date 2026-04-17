@@ -33,7 +33,7 @@ export async function checkSRP(
   for (const fi of fileImports) {
     const targetModules = new Set<string>();
     for (const imp of fi.imports) {
-      const target = (imp as { _targetModule?: string })._targetModule;
+      const target = imp.targetModule;
       if (target && target !== fi.moduleName && target !== '_root') {
         targetModules.add(target);
       }

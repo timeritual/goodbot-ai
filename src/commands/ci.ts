@@ -8,6 +8,7 @@ import { loadSnapshot, buildSnapshot, compareFreshness } from '../freshness/inde
 import type { FreshnessReport } from '../freshness/index.js';
 import { log, safeWriteFile } from '../utils/index.js';
 import type { FullAnalysis, HealthGrade } from '../analyzers/index.js';
+import { checkBudget, type BudgetEntry } from './analyze.js';
 
 const GRADE_ORDER: HealthGrade[] = ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F'];
 
@@ -64,7 +65,10 @@ export const ciCommand = new Command('ci')
 
       spinner.succeed(`Analysis complete (${result.dependency.timeTakenMs}ms)`);
 
-      const markdown = generateCIComment(result, opts.mode, opts.base, freshnessReport);
+      // Check budget
+      const budgetEntries = config ? checkBudget(result, config) : [];
+
+      const markdown = generateCIComment(result, opts.mode, opts.base, freshnessReport, budgetEntries);
 
       // Write outputs
       if (opts.output) {
@@ -86,6 +90,7 @@ export const ciCommand = new Command('ci')
           modules: result.dependency.modules.length,
           filesParsed: result.dependency.filesParsed,
           freshness: freshnessReport ?? null,
+          budget: budgetEntries.length > 0 ? budgetEntries : null,
         };
         await safeWriteFile(opts.json, JSON.stringify(serializable, null, 2));
         log.success(`JSON written to ${opts.json}`);
@@ -106,6 +111,7 @@ function generateCIComment(
   mode: string,
   baseBranch: string,
   freshnessReport?: FreshnessReport,
+  budgetEntries?: BudgetEntry[],
 ): string {
   const { health, solid, dependency: dep } = analysis;
 
@@ -209,6 +215,27 @@ function generateCIComment(
       } else {
         lines.push(`> ℹ️ ${moved.length} claim${moved.length > 1 ? 's' : ''} changed. Run \`goodbot generate --analyze --force\` to update guardrails.`);
       }
+      lines.push('');
+    }
+  }
+
+  // Budget section
+  if (budgetEntries && budgetEntries.length > 0) {
+    const overBudget = budgetEntries.filter(e => e.overBudget);
+    const budgetEmoji = overBudget.length > 0 ? '🔴' : '🟢';
+
+    lines.push(`### ${budgetEmoji} Violation Budget`);
+    lines.push('');
+    lines.push('| Category | Actual | Budget | Status |');
+    lines.push('|----------|:------:|:------:|--------|');
+    for (const entry of budgetEntries) {
+      const status = entry.overBudget ? '❌ over budget' : '✅ within budget';
+      lines.push(`| ${entry.category} | ${entry.actual} | ${entry.budget} | ${status} |`);
+    }
+    lines.push('');
+
+    if (overBudget.length > 0) {
+      lines.push(`> ❌ **${overBudget.length} categor${overBudget.length === 1 ? 'y' : 'ies'} over budget.** Reduce violations or adjust budgets in \`.goodbot/config.json\`.`);
       lines.push('');
     }
   }

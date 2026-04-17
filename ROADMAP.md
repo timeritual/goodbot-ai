@@ -6,7 +6,7 @@ Goodbot keeps AI guardrails honest as codebases evolve. In multi-developer AI-as
 
 ---
 
-## Shipped (v0.3.0)
+## Shipped (v0.3.x)
 
 ### Core Analysis
 - Health grading (A+ to F) with weighted scoring across dependencies, stability, SOLID, architecture
@@ -17,34 +17,75 @@ Goodbot keeps AI guardrails honest as codebases evolve. In multi-developer AI-as
 - SOLID principles: SRP, DIP, ISP checking
 - Complexity, duplication, dead export, god module, shallow module detection
 - Git history analysis: hotspots, AI commit detection, temporal coupling
+- Custom rules shown as their own category (separate from SOLID violations)
+- Violation budget system — set acceptable limits per category, fail only when exceeded
 
 ### Guardrail Generation
 - 6 agent files from single config (CLAUDE.md, CODING_GUIDELINES.md, .cursorrules, .windsurfrules, AGENTS.md, .cursorignore)
 - Adaptive guardrails (`generate --analyze`) — rules reflect actual codebase state
-- Framework-specific red flags (React, Next.js, Node, Python, Go, etc.)
+- Framework-specific red flags (React, Next.js, Node, etc.)
 
 ### Freshness Detection
 - Analysis snapshots saved at generation time (`.goodbot/snapshot.json`)
 - `freshness` command compares stored claims vs current reality
+- `freshness --watch` for continuous monitoring with configurable interval
 - 16 claim categories tracked: health, violations, file lists, AI ratio, custom rules
-- Guardrail impact section in `diff` — shows what a PR moved
+- Guardrail impact via `diff --freshness` (opt-in to avoid slow git history on every diff)
 - Freshness data in CI/PR comments
 - Snapshot age warnings in `check`
 
+### Auto-Fix (`goodbot fix`)
+- Rewrite barrel-bypassing imports to use barrel files
+- Remove dead exports from barrel files
+- Generate missing barrel files
+- Sort barrel exports alphabetically
+- Add split markers to oversized files (SRP)
+- Generate missing `.cursorignore`
+- `--only <type>` flag to run specific fix types
+
 ### Workflow Integration
 - Git hooks (`hooks install/uninstall`) — post-merge check, pre-push freshness
-- GitHub Action for automated PR comments with grade + freshness
+- GitHub Action for automated PR comments with grade + freshness + budget
 - `trend --record` with per-category violation tracking
 - `trend --effectiveness` — which rule categories are improving or worsening
+- `watch` auto re-scans on directory structure changes (new modules, renamed dirs)
+- `sync` validates remote configs via Zod schema, HTTPS-only, shows change diff
+- `onboard` generates data-driven module descriptions from analysis (not hardcoded)
+- `score` checks violation budgets in addition to grade threshold
 
 ### Tooling
 - ESLint with TypeScript support
 - Prepublish validation (typecheck + lint + test + build)
-- 124 tests across 14 test files
+- 161 tests across 18 test files (analyzers, freshness, commands)
 
 ---
 
 ## Next Up
+
+### Python Import Parser
+**Problem:** Deep analysis (import graphs, SOLID, cycles, complexity, duplication, dead exports, health grading) is TS/JS only. Python projects get framework detection and guardrail generation, but no adaptive guardrails powered by live analysis.
+
+**Approach:**
+- Build a Python import parser (`import X`, `from X import Y`, relative imports)
+- Python imports are simpler than TS — no barrel files, no `index.ts` convention
+- Reuse existing graph builder, stability, cycle detection — they're language-agnostic once imports are parsed
+- Start with import graph + SRP (file size) + dead exports. Skip ISP/DIP initially (different patterns in Python)
+- Framework detection for Django/Flask/FastAPI already exists — wire the parser into the analysis pipeline
+
+**Priority:** High — Python is the most-requested non-JS language for AI-assisted codebases.
+
+### CLI Integration Tests
+**Problem:** The 161 tests cover analyzers, freshness, and command pure functions — but no test exercises the full CLI flow (init -> generate -> analyze -> diff). A regression in command wiring or argument parsing wouldn't be caught.
+
+**Approach:**
+- Create a temp project fixture with a known structure (few TS files, known violations)
+- Test the full pipeline: `init --preset recommended` -> `generate` -> `analyze --json` -> verify JSON output
+- Test `fix --dry-run` output matches expected fixes
+- Test `diff` with a synthetic git history
+- Use `execSync` to run the CLI as a subprocess, or import command actions directly
+- Keep it fast — one fixture project, ~5 integration tests
+
+**Scope:** Small — a few hours of work. High confidence gain for low effort.
 
 ### Pattern Emergence Detection
 **Problem:** When 8 out of 10 files in a module start using a new pattern (new error handling approach, new naming convention), goodbot doesn't notice. It can detect violations of declared rules, but can't detect new conventions that have emerged organically.
@@ -88,17 +129,6 @@ Goodbot keeps AI guardrails honest as codebases evolve. In multi-developer AI-as
 
 **Defer until:** Freshness detection is validated in real usage. If teams just run `generate --analyze --force` weekly and it's fine, incremental isn't worth building.
 
-### Watch Integration for Freshness
-**Problem:** `watch` monitors violations in real-time but doesn't show freshness. A developer making changes doesn't see that they're drifting the codebase away from its guardrail claims.
-
-**Approach:**
-- Load snapshot on `watch` startup
-- On each re-analysis, compare against snapshot
-- Show a one-line freshness summary in the watch dashboard: "Guardrails: 3 claims stale"
-- Only show claims that changed since watch started (not full report)
-
-**Risk:** Could make the watch output too noisy. Better to try it and see.
-
 ---
 
 ## Future Explorations
@@ -109,7 +139,7 @@ Currently TS/JS only for import parsing and SOLID analysis. Python support is pa
 **Priority:** Depends on user demand. The guardrail generation and freshness features work for any language — it's the deep analysis (import graphs, SOLID) that's language-specific.
 
 ### Config-as-Code for Rules
-Move beyond freeform `customRules` strings to structured, validatable rules. The `customRulesConfig` field already supports pattern-based rules with `forbidden_in`/`required_in`. Extend this to:
+Move beyond freeform `customRules` strings to structured, validatable rules. The `customRulesConfig` field already supports pattern-based rules with `forbiddenIn`/`requiredIn`. Extend this to:
 - Import pattern rules ("services must not import from components")
 - File naming rules ("hooks must start with `use`")
 - Dependency rules ("no direct `fetch` in components")

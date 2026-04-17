@@ -30,7 +30,7 @@ export function checkDIP(
     for (const imp of fi.imports) {
       if (!imp.resolvedPath) continue;
 
-      const targetModule = (imp as { _targetModule?: string })._targetModule;
+      const targetModule = imp.targetModule;
       if (!targetModule || targetModule === fi.moduleName || targetModule === '_root') continue;
 
       const toLevel = levelByModule.get(targetModule) ?? -1;

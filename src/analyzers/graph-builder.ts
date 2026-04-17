@@ -34,11 +34,7 @@ export function buildDependencyGraph(
     for (const imp of fi.imports) {
       if (!imp.resolvedPath) continue;
 
-      // Determine target module from resolved path
-      // The target module name is already set during resolution phase
-      // We need the module name from the resolved path — caller sets this
-      // For now we use the _targetModule field that the orchestrator attaches
-      const targetModule = (imp as { _targetModule?: string })._targetModule;
+      const targetModule = imp.targetModule;
       if (!targetModule) continue;
 
       // Skip intra-module imports

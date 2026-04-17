@@ -3,7 +3,7 @@
 {{#ifEquals architecture.barrelImportRule "always"}}
 **Always import from barrel files** (e.g., `../services`, `../hooks`), never from internal files like `../services/orderService`.
 
-This is enforced by ESLint `import/no-restricted-paths` — CI will fail on violations.
+This is checked by `goodbot analyze` — barrel bypasses are flagged as violations.
 
 Example:
 ```

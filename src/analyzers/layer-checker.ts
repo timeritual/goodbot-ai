@@ -25,7 +25,7 @@ export function findLayerViolations(
     if (fromLevel === undefined) continue; // Unmanaged module
 
     for (const imp of fi.imports) {
-      const targetModule = (imp as { _targetModule?: string })._targetModule;
+      const targetModule = imp.targetModule;
       if (!targetModule || targetModule === fi.moduleName) continue;
 
       const toLevel = levelByModule.get(targetModule);

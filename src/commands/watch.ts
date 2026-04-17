@@ -15,7 +15,7 @@ export const watchCommand = new Command('watch')
     const projectRoot = opts.path;
 
     // Initial scan to find src root
-    const scan = await runFullScan(projectRoot);
+    let scan = await runFullScan(projectRoot);
     if (!scan.structure.srcRoot) {
       log.error('No src directory found. Nothing to watch.');
       process.exit(1);
@@ -27,9 +27,10 @@ export const watchCommand = new Command('watch')
     const srcPath = path.join(projectRoot, scan.structure.srcRoot);
     let lastAnalysis: FullAnalysis | null = null;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let needsRescan = false;
 
     // Run initial analysis
-    await runAndRender(projectRoot, scan, config);
+    await runAndRender(projectRoot);
 
     // Watch for changes
     const watcher = watch(srcPath, {
@@ -44,20 +45,37 @@ export const watchCommand = new Command('watch')
       ignoreInitial: true,
     });
 
-    const onFileChange = (filePath: string) => {
-      if (!/\.(ts|tsx|js|jsx)$/.test(filePath)) return;
+    const scheduleReanalysis = (filePath: string, rescan: boolean) => {
+      if (rescan) needsRescan = true;
 
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(async () => {
         const relative = path.relative(projectRoot, filePath);
-        console.log(chalk.dim(`\n  File changed: ${relative}`));
-        await runAndRender(projectRoot, scan, config);
+        if (needsRescan) {
+          console.log(chalk.dim(`\n  Structure changed: ${relative} — re-scanning...`));
+        } else {
+          console.log(chalk.dim(`\n  File changed: ${relative}`));
+        }
+        await runAndRender(projectRoot);
       }, 500);
+    };
+
+    const onFileChange = (filePath: string) => {
+      if (!/\.(ts|tsx|js|jsx)$/.test(filePath)) return;
+      scheduleReanalysis(filePath, false);
     };
 
     watcher.on('change', onFileChange);
     watcher.on('add', onFileChange);
     watcher.on('unlink', onFileChange);
+
+    // Re-scan when directories are added or removed (new modules, restructuring)
+    watcher.on('addDir', (dirPath) => {
+      scheduleReanalysis(dirPath, true);
+    });
+    watcher.on('unlinkDir', (dirPath) => {
+      scheduleReanalysis(dirPath, true);
+    });
 
     console.log(chalk.dim(`\n  Watching ${srcPath} for changes... (Ctrl+C to stop)\n`));
 
@@ -69,13 +87,16 @@ export const watchCommand = new Command('watch')
       process.exit(0);
     });
 
-    async function runAndRender(
-      root: string,
-      scanResult: Awaited<ReturnType<typeof runFullScan>>,
-      cfg: typeof config,
-    ) {
+    async function runAndRender(root: string) {
       try {
-        const result = await runFullAnalysis(root, scanResult.structure, cfg);
+        // Re-scan if directory structure changed (new modules, renamed dirs, etc.)
+        if (needsRescan) {
+          scan = await runFullScan(root);
+          try { config = await loadConfig(root); } catch { /* no config */ }
+          needsRescan = false;
+        }
+
+        const result = await runFullAnalysis(root, scan.structure, config);
         const prev = lastAnalysis;
         lastAnalysis = result;
 

@@ -4,6 +4,8 @@ export interface ParsedImport {
   resolvedPath: string | null;
   line: number;
   kind: 'import' | 'require' | 'reexport';
+  /** The module name of the resolved import target (set during import resolution) */
+  targetModule?: string;
 }
 
 /** All imports found in a single file */
@@ -92,7 +94,7 @@ export interface DependencyAnalysis {
 
 // ─── SOLID Analysis ───────────────────────────────────────
 
-export type SolidPrinciple = 'SRP' | 'OCP' | 'LSP' | 'ISP' | 'DIP';
+export type SolidPrinciple = 'SRP' | 'OCP' | 'LSP' | 'ISP' | 'DIP' | 'CUSTOM';
 export type ViolationSeverity = 'info' | 'warning' | 'error';
 
 export interface SolidViolation {

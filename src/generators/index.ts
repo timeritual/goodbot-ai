@@ -4,9 +4,8 @@ import { buildContext } from './context-builder.js';
 import { renderTemplate } from './template-engine.js';
 import type { GeneratedFile } from './types.js';
 
-export type { GeneratorContext, GeneratedFile, AnalysisInsights } from './types.js';
+export type { AnalysisInsights } from './types.js';
 export { buildContext } from './context-builder.js';
-export { renderTemplate } from './template-engine.js';
 export { generateArchitectureMd } from './mermaid.js';
 
 const FILE_MAP: Array<{

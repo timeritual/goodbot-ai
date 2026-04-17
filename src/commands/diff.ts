@@ -16,6 +16,7 @@ export const diffCommand = new Command('diff')
   .description('Analyze only changed files — shows new/resolved violations vs base branch')
   .option('-p, --path <path>', 'Project path', process.cwd())
   .option('-b, --base <branch>', 'Base branch to compare against', 'main')
+  .option('--freshness', 'Include guardrail freshness comparison (slower — runs git history analysis)', false)
   .option('--json', 'Output as JSON', false)
   .action(async (opts) => {
     const projectRoot = opts.path;
@@ -40,22 +41,26 @@ export const diffCommand = new Command('diff')
       // Run full analysis on current state
       const current = await runFullAnalysis(projectRoot, scan.structure, config);
 
-      // Build freshness report if snapshot exists
+      // Only build freshness report if explicitly requested (it's expensive due to git history)
       let freshnessReport: FreshnessReport | undefined;
-      const stored = await loadSnapshot(projectRoot);
-      if (stored) {
-        spinner.text = 'Comparing against guardrail snapshot...';
-        const gitHistory = await analyzeGitHistory(projectRoot, 500, scan.structure.srcRoot ?? undefined);
-        const temporalCouplings = findTemporalCoupling(gitHistory.commits, 3, 0.5, scan.structure.srcRoot ?? undefined);
-        const context = buildContext(config!, undefined, current, gitHistory, temporalCouplings);
-        if (context.analysisInsights) {
-          const currentSnapshot = buildSnapshot(
-            context.analysisInsights,
-            config?.conventions.customRules ?? [],
-            current.dependency.modules.length,
-            current.dependency.filesParsed,
-          );
-          freshnessReport = compareFreshness(stored, currentSnapshot);
+      if (opts.freshness) {
+        const stored = await loadSnapshot(projectRoot);
+        if (stored) {
+          spinner.text = 'Comparing against guardrail snapshot...';
+          const gitHistory = await analyzeGitHistory(projectRoot, 500, scan.structure.srcRoot ?? undefined);
+          const temporalCouplings = findTemporalCoupling(gitHistory.commits, 3, 0.5, scan.structure.srcRoot ?? undefined);
+          const context = buildContext(config!, undefined, current, gitHistory, temporalCouplings);
+          if (context.analysisInsights) {
+            const currentSnapshot = buildSnapshot(
+              context.analysisInsights,
+              config?.conventions.customRules ?? [],
+              current.dependency.modules.length,
+              current.dependency.filesParsed,
+            );
+            freshnessReport = compareFreshness(stored, currentSnapshot);
+          }
+        } else {
+          log.dim('No snapshot found — skipping freshness comparison. Run `goodbot generate --analyze` first.');
         }
       }
 
@@ -66,7 +71,7 @@ export const diffCommand = new Command('diff')
           changedFiles,
           health: current.health,
           violations: filterToChangedFiles(current, changedFiles),
-          freshness: freshnessReport,
+          freshness: freshnessReport ?? null,
         };
         console.log(JSON.stringify(output, null, 2));
         return;
@@ -118,7 +123,7 @@ interface FilteredViolations {
   details: Array<{ type: string; file: string; message: string }>;
 }
 
-function filterToChangedFiles(analysis: FullAnalysis, changedFiles: string[]): FilteredViolations {
+export function filterToChangedFiles(analysis: FullAnalysis, changedFiles: string[]): FilteredViolations {
   const changed = new Set(changedFiles);
 
   const layerViolations = analysis.dependency.layerViolations.filter((v) => changed.has(v.file));
@@ -184,9 +189,12 @@ function renderDiff(
     log.warn(`${totalNew} violation${totalNew > 1 ? 's' : ''} in changed files.`);
   }
 
-  // Show freshness impact if snapshot exists
+  // Show freshness impact if available
   if (freshnessReport) {
     renderFreshnessImpact(freshnessReport);
+  } else {
+    console.log();
+    log.dim('Tip: Use `goodbot diff --freshness` to compare against your guardrail snapshot.');
   }
 }
 

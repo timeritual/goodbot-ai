@@ -297,6 +297,7 @@ export const initCommand = new Command('init')
       analysis: {
         solid: true,
         thresholds: { maxFileLines: 300, maxBarrelExports: 15, maxModuleCoupling: 8 },
+        budget: {},
       },
       customRulesConfig: [],
       team: {},

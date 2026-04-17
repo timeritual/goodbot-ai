@@ -6,17 +6,31 @@ import { createInterface } from 'node:readline';
 import ora from 'ora';
 import chalk from 'chalk';
 import { runFullScan } from '../scanners/index.js';
-import { runFullAnalysis } from '../analyzers/index.js';
+import {
+  runFullAnalysis, checkDeadExports, collectSourceFiles,
+} from '../analyzers/index.js';
 import { loadConfig } from '../config/index.js';
 import { log, safeWriteFile, safeReadFile, fileExists } from '../utils/index.js';
-import type { FullAnalysis } from '../analyzers/index.js';
+import type { FullAnalysis, BarrelViolation, DeadExportResult } from '../analyzers/index.js';
+import type { StructureAnalysis } from '../scanners/index.js';
+
+const VALID_FIX_TYPES = ['barrels', 'imports', 'dead-exports', 'srp', 'sort'] as const;
+type FixType = typeof VALID_FIX_TYPES[number];
 
 export const fixCommand = new Command('fix')
   .description('Auto-fix architectural violations where possible')
   .option('-p, --path <path>', 'Project path', process.cwd())
   .option('--dry-run', 'Preview fixes without applying', false)
+  .option('--only <type>', 'Run only specific fix type: barrels, imports, dead-exports, srp, sort')
   .action(async (opts) => {
     const projectRoot = opts.path;
+
+    if (opts.only && !VALID_FIX_TYPES.includes(opts.only as FixType)) {
+      log.error(`Unknown fix type "${opts.only}". Valid types: ${VALID_FIX_TYPES.join(', ')}`);
+      process.exit(1);
+    }
+
+    const only: FixType | undefined = opts.only;
     const spinner = ora('Analyzing project...').start();
 
     try {
@@ -28,15 +42,37 @@ export const fixCommand = new Command('fix')
       spinner.succeed('Analysis complete');
 
       let fixCount = 0;
+      const shouldRun = (type: FixType) => !only || only === type;
 
-      // Fix 1: Generate missing barrel files
-      fixCount += await fixMissingBarrels(projectRoot, scan.structure, opts.dryRun);
+      // Fix 1: Rewrite barrel-bypassing imports
+      if (shouldRun('imports')) {
+        fixCount += await fixBarrelImports(projectRoot, analysis, opts.dryRun);
+      }
 
-      // Fix 2: Add split markers to oversized files
-      fixCount += await fixSRPViolations(projectRoot, analysis, opts.dryRun);
+      // Fix 2: Remove dead exports from barrels
+      if (shouldRun('dead-exports')) {
+        fixCount += await fixDeadExports(projectRoot, scan.structure, opts.dryRun);
+      }
 
-      // Fix 3: Generate .cursorignore if missing
-      fixCount += await fixMissingCursorignore(projectRoot, scan, opts.dryRun);
+      // Fix 3: Generate missing barrel files
+      if (shouldRun('barrels')) {
+        fixCount += await fixMissingBarrels(projectRoot, scan.structure, opts.dryRun);
+      }
+
+      // Fix 4: Sort barrel exports alphabetically
+      if (shouldRun('sort')) {
+        fixCount += await fixBarrelSorting(projectRoot, scan.structure, opts.dryRun);
+      }
+
+      // Fix 5: Add split markers to oversized files
+      if (shouldRun('srp')) {
+        fixCount += await fixSRPViolations(projectRoot, analysis, opts.dryRun);
+      }
+
+      // Fix 6: Generate .cursorignore if missing
+      if (shouldRun('barrels')) {
+        fixCount += await fixMissingCursorignore(projectRoot, scan, opts.dryRun);
+      }
 
       console.log();
       if (fixCount === 0) {
@@ -53,16 +89,179 @@ export const fixCommand = new Command('fix')
     }
   });
 
+// ─── Fix: Barrel Import Rewrites ─────────────────────────
+
+async function fixBarrelImports(
+  projectRoot: string,
+  analysis: FullAnalysis,
+  dryRun: boolean,
+): Promise<number> {
+  const violations = analysis.dependency.barrelViolations;
+  if (violations.length === 0) return 0;
+
+  // Group violations by file so we can batch-edit each file once
+  const byFile = new Map<string, BarrelViolation[]>();
+  for (const v of violations) {
+    const existing = byFile.get(v.file) ?? [];
+    existing.push(v);
+    byFile.set(v.file, existing);
+  }
+
+  let fixCount = 0;
+
+  if (dryRun && violations.length > 0) {
+    console.log();
+    log.header(`Barrel Import Fixes (${violations.length})`);
+  }
+
+  for (const [file, fileViolations] of byFile) {
+    const filePath = path.join(projectRoot, file);
+    const content = await safeReadFile(filePath);
+    if (!content) continue;
+
+    const lines = content.split('\n');
+    let modified = false;
+
+    for (const violation of fileViolations) {
+      const lineIdx = violation.line - 1;
+      if (lineIdx < 0 || lineIdx >= lines.length) continue;
+
+      const line = lines[lineIdx];
+
+      // Build the barrel import path by stripping the last path segment
+      const barrelSpecifier = violation.specifier.replace(/\/[^/]+$/, '').replace(/\/index$/, '');
+      if (barrelSpecifier === violation.specifier) continue;
+
+      const newLine = line.replace(violation.specifier, barrelSpecifier);
+      if (newLine === line) continue;
+
+      if (dryRun) {
+        console.log(`  ${chalk.yellow('~')} ${chalk.dim(file)}:${violation.line} — '${chalk.red(violation.specifier)}' ${chalk.dim('→')} '${chalk.green(barrelSpecifier)}'`);
+      } else {
+        lines[lineIdx] = newLine;
+        modified = true;
+      }
+      fixCount++;
+    }
+
+    if (modified) {
+      await safeWriteFile(filePath, lines.join('\n'));
+      log.success(`Fixed ${fileViolations.length} barrel import${fileViolations.length > 1 ? 's' : ''} in ${file}`);
+    }
+  }
+
+  return fixCount;
+}
+
+// ─── Fix: Dead Export Removal ─────────────────────────────
+
+async function fixDeadExports(
+  projectRoot: string,
+  structure: StructureAnalysis,
+  dryRun: boolean,
+): Promise<number> {
+  if (!structure.srcRoot) return 0;
+
+  const srcRootAbsolute = path.resolve(projectRoot, structure.srcRoot);
+  const sourceFiles = await collectSourceFiles(srcRootAbsolute);
+  if (sourceFiles.length === 0) return 0;
+
+  const { deadExports } = await checkDeadExports(
+    sourceFiles, structure.detectedLayers, srcRootAbsolute, projectRoot,
+  );
+
+  if (deadExports.length === 0) return 0;
+
+  // Group by module
+  const byModule = new Map<string, DeadExportResult[]>();
+  for (const de of deadExports) {
+    const existing = byModule.get(de.moduleName) ?? [];
+    existing.push(de);
+    byModule.set(de.moduleName, existing);
+  }
+
+  let fixCount = 0;
+
+  if (dryRun) {
+    console.log();
+    log.header(`Dead Export Removal (${byModule.size} module${byModule.size > 1 ? 's' : ''})`);
+  }
+
+  for (const [moduleName, exports] of byModule) {
+    const barrelPath = path.join(srcRootAbsolute, moduleName, 'index.ts');
+    const content = await safeReadFile(barrelPath);
+    if (!content) continue;
+
+    const deadNames = new Set(exports.map(e => e.exportName));
+    const lines = content.split('\n');
+    const newLines: string[] = [];
+    let removedCount = 0;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+
+      // Handle: export { a, b, c } from '...'
+      const braceMatch = trimmed.match(/^export\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/);
+      if (braceMatch) {
+        const symbols = braceMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+        const kept = symbols.filter(s => {
+          const name = s.includes(' as ') ? s.split(/\s+as\s+/)[1].trim() : s.split(/\s/)[0];
+          return !deadNames.has(name);
+        });
+
+        if (kept.length === 0) {
+          // Entire line is dead — remove it
+          removedCount += symbols.length;
+          continue;
+        } else if (kept.length < symbols.length) {
+          // Partial removal — rewrite the line
+          removedCount += symbols.length - kept.length;
+          const typePrefix = trimmed.startsWith('export type') ? 'type ' : '';
+          newLines.push(`export ${typePrefix}{ ${kept.join(', ')} } from '${braceMatch[2]}';`);
+          continue;
+        }
+      }
+
+      // Handle: export const/function/type/interface NAME
+      const declMatch = trimmed.match(
+        /^export\s+(?:default\s+)?(?:const|let|var|function|class|type|interface|enum|async\s+function)\s+(\w+)/,
+      );
+      if (declMatch && deadNames.has(declMatch[1])) {
+        removedCount++;
+        continue;
+      }
+
+      newLines.push(line);
+    }
+
+    if (removedCount === 0) continue;
+
+    const names = exports.map(e => e.exportName).slice(0, 6);
+    const more = exports.length > 6 ? ` and ${exports.length - 6} more` : '';
+
+    if (dryRun) {
+      console.log(`  ${chalk.yellow('~')} ${chalk.bold(moduleName)}/index.ts — would remove: ${chalk.red(names.join(', '))}${more}`);
+    } else {
+      await safeWriteFile(barrelPath, newLines.join('\n'));
+      log.success(`Removed ${removedCount} dead export${removedCount > 1 ? 's' : ''} from ${moduleName}/index.ts`);
+    }
+    fixCount++;
+  }
+
+  return fixCount;
+}
+
 // ─── Fix: Missing Barrel Files ────────────────────────────
 
 async function fixMissingBarrels(
   projectRoot: string,
-  structure: Awaited<ReturnType<typeof runFullScan>>['structure'],
+  structure: StructureAnalysis,
   dryRun: boolean,
 ): Promise<number> {
   if (!structure.srcRoot) return 0;
 
   let fixCount = 0;
+  const printed = { header: false };
 
   for (const layer of structure.detectedLayers) {
     if (layer.hasBarrel) continue;
@@ -78,14 +277,17 @@ async function fixMissingBarrels(
     if (exports.length === 0) continue;
 
     const content = exports
+      .sort()
       .map((f) => `export * from './${f.replace(/\.(ts|tsx)$/, '.js')}';`)
       .join('\n') + '\n';
 
     if (dryRun) {
-      console.log(`  ${chalk.cyan('+')} Would create ${chalk.bold(path.relative(projectRoot, indexPath))}`);
-      for (const f of exports) {
-        console.log(chalk.dim(`    export * from './${f.replace(/\.(ts|tsx)$/, '.js')}';`));
+      if (!printed.header) {
+        console.log();
+        log.header('Missing Barrels');
+        printed.header = true;
       }
+      console.log(`  ${chalk.cyan('+')} Would create ${chalk.bold(path.relative(projectRoot, indexPath))}`);
     } else {
       await safeWriteFile(indexPath, content);
       log.success(`Created barrel: ${path.relative(projectRoot, indexPath)}`);
@@ -111,6 +313,92 @@ async function collectExportableFiles(dirPath: string): Promise<string[]> {
   }
 }
 
+// ─── Fix: Sort Barrel Exports ─────────────────────────────
+
+async function fixBarrelSorting(
+  projectRoot: string,
+  structure: StructureAnalysis,
+  dryRun: boolean,
+): Promise<number> {
+  if (!structure.srcRoot) return 0;
+
+  let fixCount = 0;
+  const printed = { header: false };
+
+  for (const layer of structure.detectedLayers) {
+    if (!layer.hasBarrel) continue;
+
+    const srcRootAbsolute = path.resolve(projectRoot, structure.srcRoot!);
+    const barrelPath = path.join(srcRootAbsolute, layer.name, 'index.ts');
+    const content = await safeReadFile(barrelPath);
+    if (!content) continue;
+
+    const lines = content.split('\n');
+
+    // Collect export lines vs non-export lines (comments, blank lines, etc.)
+    const exportLines: string[] = [];
+    const nonExportLines: { index: number; line: string }[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+      if (trimmed.startsWith('export ') && (trimmed.includes('from ') || trimmed.includes('from\t'))) {
+        exportLines.push(lines[i]);
+      } else {
+        nonExportLines.push({ index: i, line: lines[i] });
+      }
+    }
+
+    if (exportLines.length < 2) continue;
+
+    const sorted = [...exportLines].sort((a, b) => {
+      // Sort by the 'from' specifier
+      const aFrom = a.match(/from\s+['"]([^'"]+)['"]/)?.[1] ?? a;
+      const bFrom = b.match(/from\s+['"]([^'"]+)['"]/)?.[1] ?? b;
+      return aFrom.localeCompare(bFrom);
+    });
+
+    // Check if already sorted
+    const alreadySorted = exportLines.every((line, i) => line === sorted[i]);
+    if (alreadySorted) continue;
+
+    if (dryRun) {
+      if (!printed.header) {
+        console.log();
+        log.header('Barrel Export Sorting');
+        printed.header = true;
+      }
+      console.log(`  ${chalk.yellow('~')} ${chalk.bold(layer.name)}/index.ts — ${exportLines.length} exports would be sorted`);
+    } else {
+      // Rebuild the file: non-export lines stay in place, exports are sorted
+      // Simple approach: put sorted exports first, then any trailing content
+      const result: string[] = [];
+
+      // Preserve any leading non-export content (comments, pragmas)
+      for (const ne of nonExportLines) {
+        if (ne.index < lines.indexOf(exportLines[0])) {
+          result.push(ne.line);
+        }
+      }
+
+      result.push(...sorted);
+
+      // Preserve any trailing non-export content
+      const lastExportIdx = lines.lastIndexOf(exportLines[exportLines.length - 1]);
+      for (const ne of nonExportLines) {
+        if (ne.index > lastExportIdx) {
+          result.push(ne.line);
+        }
+      }
+
+      await safeWriteFile(barrelPath, result.join('\n'));
+      log.success(`Sorted ${exportLines.length} exports in ${layer.name}/index.ts`);
+    }
+    fixCount++;
+  }
+
+  return fixCount;
+}
+
 // ─── Fix: SRP Violations (split markers) ──────────────────
 
 async function fixSRPViolations(
@@ -120,11 +408,12 @@ async function fixSRPViolations(
 ): Promise<number> {
   const srpErrors = analysis.solid.violations
     .filter((v) => v.principle === 'SRP' && v.severity === 'error')
-    .slice(0, 10); // Limit to top 10
+    .slice(0, 10);
 
   if (srpErrors.length === 0) return 0;
 
   let fixCount = 0;
+  const printed = { header: false };
 
   for (const violation of srpErrors) {
     const filePath = path.join(projectRoot, violation.file);
@@ -133,12 +422,16 @@ async function fixSRPViolations(
     if (splits.length === 0) continue;
 
     if (dryRun) {
+      if (!printed.header) {
+        console.log();
+        log.header('SRP Split Points');
+        printed.header = true;
+      }
       console.log(`  ${chalk.yellow('~')} ${chalk.bold(violation.file)} — ${splits.length} suggested split point${splits.length > 1 ? 's' : ''}:`);
       for (const split of splits) {
         console.log(chalk.dim(`    Line ${split.line}: // --- split: ${split.suggestedName} ---`));
       }
     } else {
-      // Insert split markers into the file
       const content = await safeReadFile(filePath);
       if (!content) continue;
 
@@ -182,7 +475,6 @@ async function findSplitPoints(filePath: string): Promise<SplitPoint[]> {
     lineNumber++;
     const trimmed = line.trim();
 
-    // Track exported functions/components as natural split boundaries
     const exportMatch = trimmed.match(
       /^export\s+(?:default\s+)?(?:const|function|class|interface|type|enum)\s+(\w+)/,
     );
@@ -190,7 +482,6 @@ async function findSplitPoints(filePath: string): Promise<SplitPoint[]> {
     if (exportMatch) {
       exportCount++;
       if (lastExportLine > 0 && lineNumber - lastExportLine > 80) {
-        // Significant gap since last export — good split point
         const name = exportMatch[1];
         const suggestedFile = `${camelToKebab(name)}.ts`;
         splits.push({ line: lineNumber, suggestedName: suggestedFile });
@@ -199,7 +490,6 @@ async function findSplitPoints(filePath: string): Promise<SplitPoint[]> {
     }
   }
 
-  // Only suggest splits if file has multiple exports with significant gaps
   return exportCount >= 2 ? splits.slice(0, 3) : [];
 }
 
@@ -235,6 +525,7 @@ async function fixMissingCursorignore(
   ].join('\n');
 
   if (dryRun) {
+    console.log();
     console.log(`  ${chalk.cyan('+')} Would create ${chalk.bold('.cursorignore')}`);
   } else {
     await safeWriteFile(ignorePath, content);

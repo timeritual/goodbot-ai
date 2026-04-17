@@ -174,7 +174,7 @@ async function extractImportedSymbols(
     let pendingImport = '';
 
     for await (const line of rl) {
-      let trimmed = line.trim();
+      const trimmed = line.trim();
 
       // Handle multi-line imports
       if (pendingImport) {

@@ -275,6 +275,8 @@ SOLID Analysis
 | **Dead Exports** | Finds barrel exports that nothing imports — common in AI-generated code |
 | **God Modules** | Modules with excessive fan-in and fan-out (too many responsibilities) |
 | **Shallow Modules** | Wide interfaces with little implementation — re-export layers adding no value |
+| **Custom Rules** | Team-defined import rules (`forbiddenIn`, `requiredIn`, `maxImports`) — shown in their own section |
+| **Violation Budgets** | Compares actual violations against configured limits per category |
 
 With `--git`, also analyzes git history:
 
@@ -295,8 +297,6 @@ With `--git`, also analyzes git history:
 
 Analyze only changed files. Shows violations introduced by your current branch — perfect for PR reviews and CI. Doesn't show 50 existing violations, just the delta.
 
-If a freshness snapshot exists (from `generate --analyze`), also shows **guardrail impact** — which claims your changes have moved:
-
 ```
 $ goodbot diff --base main
 
@@ -316,6 +316,16 @@ Violations in Changed Files
 
 ⚠ 1 violation in changed files.
 
+Tip: Use `goodbot diff --freshness` to compare against your guardrail snapshot.
+```
+
+Add `--freshness` for **guardrail impact** — compares your changes against the stored snapshot to show which claims have moved:
+
+```
+$ goodbot diff --base main --freshness
+
+  ...
+
 Guardrail Impact
 ──────────────────────────────────────────────────
   Your guardrails were generated 13d ago. This diff has moved:
@@ -330,7 +340,8 @@ Guardrail Impact
 | Flag | Description |
 |------|-------------|
 | `--base <branch>` | Base branch to compare against (default: main) |
-| `--json` | Output as JSON (includes freshness report if snapshot exists) |
+| `--freshness` | Include guardrail freshness comparison (runs git history analysis) |
+| `--json` | Output as JSON |
 
 ### `goodbot watch`
 
@@ -353,28 +364,39 @@ $ goodbot watch
     ✓ [SRP] src/services/orderService.ts
 ```
 
-Shows new and resolved violations in real-time as you code. Color-coded deltas so you immediately see if your changes are improving or degrading the architecture.
+Shows new and resolved violations in real-time as you code. Color-coded deltas so you immediately see if your changes are improving or degrading the architecture. Automatically re-scans when directories are added or removed (new modules, restructuring).
 
 ### `goodbot fix`
 
-Auto-fix what it can. Generates missing barrel files, adds split markers to oversized files, creates missing `.cursorignore`.
+Auto-fix architectural violations. Rewrites barrel-bypassing imports, removes dead exports from barrels, generates missing barrel files, adds split markers to oversized files, sorts barrel exports, and creates missing `.cursorignore`.
 
 ```
 $ goodbot fix --dry-run
 
 ✔ Analysis complete
-  ~ src/components/Canvas/operations/SelectionOperations.ts — 3 suggested split points:
-    Line 311: // --- split: find-closest-shape.ts ---
-    Line 499: // --- split: is-point-near-midpoint-circle.ts ---
-    Line 639: // --- split: find-closest-independent-line.ts ---
+
+Barrel Import Fixes (3)
+  ~ src/screens/Home.ts:5 — '../services/orderService' → '../services'
+  ~ src/screens/Home.ts:8 — '../utils/format' → '../utils'
+  ~ src/hooks/useAuth.ts:2 — '../services/authService' → '../services'
+
+Dead Export Removal (2)
+  ~ config/index.ts — would remove: configDir, checksumsPath
+  ~ generators/index.ts — would remove: renderTemplate
+
+Missing Barrels (1)
   + Would create src/features/index.ts
 
-ℹ 2 fixes available. Run `goodbot fix` to apply.
+SRP Split Points (1)
+  ~ src/components/Canvas/operations/SelectionOperations.ts — 3 suggested split points
+
+ℹ 7 fixes available. Run `goodbot fix` to apply.
 ```
 
 | Flag | Description |
 |------|-------------|
 | `--dry-run` | Preview fixes without applying |
+| `--only <type>` | Run only specific fix types: `barrels`, `imports`, `dead-exports`, `srp`, `sort` |
 
 ### `goodbot score`
 
@@ -385,7 +407,7 @@ $ goodbot score
 B+ (80/100)
 ```
 
-Exits with code 1 if grade is D or F — use it as a pre-commit hook:
+Exits with code 1 if grade is D or F, or if any [violation budget](#violation-budgets) is exceeded — use it as a pre-commit hook:
 
 ```bash
 # .husky/pre-commit
@@ -420,9 +442,19 @@ Guardrail Freshness Report (generated 12 days ago)
 
 Requires a snapshot (created automatically on first `goodbot generate`, or on any run with `--analyze`). Exits with code 1 if any claims are degraded — use it in CI to catch guardrail drift.
 
+Use `--watch` for continuous monitoring:
+
+```bash
+goodbot freshness --watch        # Poll every 60 seconds
+goodbot freshness --watch 30     # Poll every 30 seconds
+```
+
+Clears the screen and redraws on each tick, with alerts when the overall status changes (e.g., fresh to degraded).
+
 | Flag | Description |
 |------|-------------|
 | `--json` | Output full freshness report as JSON |
+| `--watch [seconds]` | Continuously monitor freshness (default: 60s, minimum: 10s) |
 | `--path <path>` | Project path |
 
 ### `goodbot hooks`
@@ -513,9 +545,9 @@ goodbot checks three statically-analyzable SOLID principles and **generates guid
 
 ---
 
-## Suppressing Violations
+## Managing Violations
 
-Create `.goodbot/ignore` to suppress false positives:
+**Suppress false positives** with `.goodbot/ignore`:
 
 ```
 # Ignore all violations in legacy code
@@ -527,6 +559,8 @@ src/contexts/SketchContext.tsx SRP
 # Ignore barrel violations in test utilities
 src/test-utils/** BARREL
 ```
+
+**Accept known debt** with [violation budgets](#violation-budgets) — acknowledge violations without hiding them, and fail only when the count exceeds the budget.
 
 ---
 
@@ -621,9 +655,17 @@ All config lives in `.goodbot/config.json`. Here's what it controls:
       "Use --legacy-peer-deps for npm installs",
       "Use device.disableSynchronization() in Detox tests"
     ]
-  }
+  },
+  "analysis": {
+    "solid": true,
+    "thresholds": { "maxFileLines": 300, "maxBarrelExports": 15, "maxModuleCoupling": 8 },
+    "budget": { "circular": 0, "srp": 10 }
+  },
+  "customRulesConfig": []
 }
 ```
+
+See [Custom Rules](#custom-rules) and [Violation Budgets](#violation-budgets) for details on those sections.
 
 Edit this file directly or re-run `goodbot init` to regenerate it.
 
@@ -631,25 +673,27 @@ Edit this file directly or re-run `goodbot init` to regenerate it.
 
 ## Supported Frameworks
 
-goodbot auto-detects your stack and tailors the generated guidelines accordingly:
+**Deep analysis** (import graphs, SOLID checks, dependency cycles, complexity, duplication, dead exports, health grading) is currently **TypeScript/JavaScript only**. Support for Python and Go is planned.
 
-| Framework | Detection | Red flags included |
-|-----------|-----------|-------------------|
-| Angular | `package.json → @angular/core` | Logic in components, direct HTTP in components, missing DI |
-| React | `package.json → react` | Business logic in components, fetch in useEffect |
-| React Native | `package.json → react-native` | AsyncStorage misuse, fetch in screens |
-| Next.js | `package.json → next` | Secrets in client code, missing caching |
-| Express | `package.json → express` | Logic in route handlers, missing validation |
-| NestJS | `package.json → @nestjs/core` | Logic in controllers, missing DTOs |
-| Django | `requirements.txt → django` | Logic in views, querysets in templates |
-| Flask | `requirements.txt → flask` | Logic in routes, missing validation |
-| FastAPI | `requirements.txt → fastapi` | Logic in endpoints, missing Pydantic models |
-| Go | `go.mod` | Logic in handlers, missing error wrapping |
-| Node.js | `package.json` (fallback) | Logic in route handlers |
+**Framework detection and guardrail generation** work for all frameworks below — goodbot detects your stack and generates framework-specific red flags and guidelines. Projects in any language get guardrail files; TS/JS projects additionally get adaptive guardrails powered by live analysis.
+
+| Framework | Detection | Red flags included | Deep analysis |
+|-----------|-----------|-------------------|:---:|
+| Angular | `package.json → @angular/core` | Logic in components, direct HTTP in components, missing DI | Yes |
+| React | `package.json → react` | Business logic in components, fetch in useEffect | Yes |
+| React Native | `package.json → react-native` | AsyncStorage misuse, fetch in screens | Yes |
+| Next.js | `package.json → next` | Secrets in client code, missing caching | Yes |
+| Express | `package.json → express` | Logic in route handlers, missing validation | Yes |
+| NestJS | `package.json → @nestjs/core` | Logic in controllers, missing DTOs | Yes |
+| Node.js | `package.json` (fallback) | Logic in route handlers | Yes |
+| Django | `requirements.txt → django` | Logic in views, querysets in templates | Coming soon |
+| Flask | `requirements.txt → flask` | Logic in routes, missing validation | Coming soon |
+| FastAPI | `requirements.txt → fastapi` | Logic in endpoints, missing Pydantic models | Coming soon |
+| Go | `go.mod` | Logic in handlers, missing error wrapping | Coming soon |
 
 ---
 
-## Team Features
+## CI, Trends, and Multi-Repo
 
 ### `goodbot ci` — GitHub Action PR Bot
 
@@ -677,7 +721,7 @@ Or use the CLI directly:
 goodbot ci --output pr-comment.md --json result.json
 ```
 
-The PR comment includes health grade with emoji bars, violation counts, and collapsible details — and updates itself on each push. If a freshness snapshot exists, the comment also includes a **Guardrail Freshness** section showing which claims have drifted since guardrails were last generated.
+The PR comment includes health grade with emoji bars, violation counts, and collapsible details — and updates itself on each push. If a freshness snapshot exists, the comment also includes a **Guardrail Freshness** section showing which claims have drifted. If [violation budgets](#violation-budgets) are configured, a **Violation Budget** table shows which categories are within or over budget.
 
 ### `goodbot trend` — Track Health Over Time
 
@@ -743,7 +787,7 @@ goodbot sync --from https://raw.githubusercontent.com/org/config/main/.goodbot/c
 goodbot sync
 ```
 
-Merges team rules with local project identity — your project name and verification commands stay local, architecture rules come from the team.
+Merges team rules with local project identity — your project name and verification commands stay local, architecture rules come from the team. Remote configs are validated against the goodbot schema before applying, and a summary of changes is shown after sync. Only HTTPS URLs are accepted for remote sources.
 
 ### `goodbot report` — Multi-Repo Dashboard
 
@@ -783,11 +827,11 @@ goodbot onboard
 95 lines — ready for new team members.
 ```
 
-The guide includes project overview, module descriptions, import conventions, business logic rules, verification commands, and current health status.
+The guide includes project overview, data-driven module descriptions (file count, stability, dependency relationships, violations), import conventions, business logic rules, verification commands, and current health status. Module descriptions are derived from analysis data, not generic templates — so they accurately reflect your project's actual architecture.
 
 ### Custom Rules
 
-Define team-specific rules in `.goodbot/config.json`:
+Define team-specific import rules in `.goodbot/config.json`. Custom rules are validated against actual code during `goodbot analyze` and appear in their own section — separate from SOLID violations.
 
 ```json
 {
@@ -796,22 +840,71 @@ Define team-specific rules in `.goodbot/config.json`:
       "name": "no-api-in-components",
       "description": "Components must not import from api layer directly",
       "pattern": "\\.\\./(api|services/.*Service)",
-      "forbidden_in": ["src/components/**"],
+      "forbiddenIn": ["src/components/**"],
       "severity": "error"
     },
     {
       "name": "max-hook-deps",
       "description": "Hooks should not import from more than 3 modules",
       "pattern": "\\.\\./(.*)",
-      "forbidden_in": ["src/hooks/**"],
-      "max_imports": 3,
+      "forbiddenIn": ["src/hooks/**"],
+      "maxImports": 3,
       "severity": "warning"
+    },
+    {
+      "name": "services-use-types",
+      "description": "Services must import from the types module",
+      "pattern": "\\.\\./types",
+      "requiredIn": ["src/services/**"],
+      "severity": "info"
     }
   ]
 }
 ```
 
-Custom rules are checked during `goodbot analyze` and appear alongside SOLID violations.
+**Rule types:**
+
+| Field | What it does |
+|-------|-------------|
+| `forbiddenIn` | Files matching these globs must NOT import anything matching `pattern` |
+| `requiredIn` | Files matching these globs MUST import something matching `pattern` |
+| `maxImports` | Files can't have more than N imports matching `pattern` |
+| `severity` | `error` (fails CI), `warning` (flagged), `info` (noted) |
+
+Custom rules track separately in `goodbot trend --effectiveness` and appear in their own section in `goodbot analyze` output.
+
+### Violation Budgets
+
+Set acceptable limits for known technical debt. Unlike `.goodbot/ignore` (which hides violations), budgets acknowledge them and fail only when the limit is exceeded. This lets teams set realistic targets instead of either perfection or suppression.
+
+```json
+{
+  "analysis": {
+    "budget": {
+      "circular": 2,
+      "layer": 0,
+      "barrel": 5,
+      "srp": 10,
+      "complexity": 3,
+      "duplication": 5,
+      "deadExports": 8,
+      "custom": 0
+    }
+  }
+}
+```
+
+Budget results appear in `goodbot analyze`, `goodbot score`, and CI PR comments:
+
+```
+Violation Budget
+──────────────────────────────────────────────────
+  Circular dependencies    2/2 ✓ within budget
+  Layer violations         0/0 ✓ within budget
+  SRP violations           12/10 ✗ over budget
+```
+
+`goodbot score` exits with code 1 if any category is over budget — use it as a pre-commit hook alongside the grade check. Only categories with a configured budget are checked; omitted categories are unconstrained.
 
 ---
 
@@ -851,31 +944,24 @@ goodbot hooks install
 
 ## Command Reference
 
-### Free Tier
-
 | Command | Description |
 |---------|-------------|
 | `goodbot init` | Interactive project setup (or `--preset strict\|recommended\|relaxed`) |
 | `goodbot generate` | Generate AI agent guardrail files (auto-analyzes on first run) |
 | `goodbot check` | Detect drift in generated files + snapshot age |
-| `goodbot freshness` | Compare guardrail claims against current codebase reality |
+| `goodbot freshness` | Compare guardrail claims against current codebase reality (`--watch` for continuous) |
 | `goodbot hooks` | Install/uninstall git hooks for automatic freshness checks |
 | `goodbot scan` | Quick project structure detection (framework, layers, commands) |
 | `goodbot scan --analyze` | Scan + condensed health grade and architecture summary |
 | `goodbot analyze` | Full architecture + SOLID analysis with detailed health grade |
-| `goodbot diff` | Analyze only changed files vs base branch |
-| `goodbot watch` | Continuous live monitoring dashboard |
-| `goodbot fix` | Auto-fix violations (missing barrels, split markers) |
-| `goodbot score` | One-line health grade (for scripts and git hooks) |
+| `goodbot diff` | Analyze only changed files vs base branch (`--freshness` for guardrail impact) |
+| `goodbot watch` | Continuous live monitoring dashboard (auto re-scans on structural changes) |
+| `goodbot fix` | Auto-fix violations: barrel imports, dead exports, missing barrels, sort, split markers (`--only`) |
+| `goodbot score` | One-line health grade + budget check (for scripts and git hooks) |
 | `goodbot pr` | Generate PR description with architectural impact |
-
-### Team Tier
-
-| Command | Description |
-|---------|-------------|
 | `goodbot ci` | CI/CD analysis with PR comment output |
 | `goodbot trend` | Track health score over time (`--effectiveness` for per-rule trends) |
-| `goodbot sync` | Sync shared team config across repos |
+| `goodbot sync` | Sync shared team config across repos (HTTPS-only, schema-validated) |
 | `goodbot report` | Multi-repo health dashboard |
 | `goodbot onboard` | Generate new developer onboarding guide |
 

@@ -1,4 +1,4 @@
-import type { AnalysisInsights } from '../generators/types.js';
+import type { AnalysisInsights } from '../generators/index.js';
 import type { AnalysisSnapshot } from './types.js';
 import { safeReadJson, safeWriteJson } from '../utils/index.js';
 import { snapshotPath } from '../config/index.js';

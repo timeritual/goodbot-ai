@@ -13,60 +13,156 @@ export const freshnessCommand = new Command('freshness')
   .description('Check if your guardrail claims still match codebase reality')
   .option('-p, --path <path>', 'Project path', process.cwd())
   .option('--json', 'Output as JSON', false)
+  .option('--watch [interval]', 'Continuously monitor freshness (interval in seconds, default 60)')
   .action(async (opts) => {
     const projectRoot = opts.path;
 
-    // Load stored snapshot
+    if (opts.watch !== undefined) {
+      const intervalSec = typeof opts.watch === 'string' ? parseInt(opts.watch, 10) : 60;
+      if (isNaN(intervalSec) || intervalSec < 10) {
+        log.error('Watch interval must be at least 10 seconds.');
+        process.exit(1);
+      }
+      await watchFreshness(projectRoot, intervalSec, opts.json);
+      return;
+    }
+
+    const report = await runFreshnessCheck(projectRoot);
+    if (!report) return;
+
+    if (opts.json) {
+      console.log(JSON.stringify(report, null, 2));
+    } else {
+      renderReport(report);
+    }
+
+    if (report.overallStatus === 'degraded') {
+      process.exit(1);
+    }
+  });
+
+async function runFreshnessCheck(projectRoot: string): Promise<FreshnessReport | null> {
+  // Load stored snapshot
+  const stored = await loadSnapshot(projectRoot);
+  if (!stored) {
+    log.error('No snapshot found. Run `goodbot generate --analyze` first.');
+    process.exit(1);
+  }
+
+  const spinner = ora('Analyzing current codebase...').start();
+
+  try {
+    const scan = await runFullScan(projectRoot);
+    let config;
+    try { config = await loadConfig(projectRoot); } catch { /* no config */ }
+
+    spinner.text = 'Running full analysis...';
+    const fullAnalysis = await runFullAnalysis(projectRoot, scan.structure, config);
+
+    spinner.text = 'Analyzing git history...';
+    const gitHistory = await analyzeGitHistory(projectRoot, 500, scan.structure.srcRoot ?? undefined);
+    const temporalCouplings = findTemporalCoupling(gitHistory.commits, 3, 0.5, scan.structure.srcRoot ?? undefined);
+
+    // Build current snapshot from fresh analysis
+    const context = buildContext(config!, undefined, fullAnalysis, gitHistory, temporalCouplings);
+    const currentSnapshot = buildSnapshot(
+      context.analysisInsights!,
+      config?.conventions.customRules ?? [],
+      fullAnalysis.dependency.modules.length,
+      fullAnalysis.dependency.filesParsed,
+    );
+
+    spinner.succeed('Analysis complete');
+
+    return compareFreshness(stored, currentSnapshot);
+  } catch (err) {
+    spinner.fail('Freshness check failed');
+    log.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
+}
+
+async function watchFreshness(projectRoot: string, intervalSec: number, json: boolean): Promise<void> {
+  log.info(`Watching freshness every ${intervalSec}s... (Ctrl+C to stop)`);
+  console.log();
+
+  const runOnce = async () => {
     const stored = await loadSnapshot(projectRoot);
     if (!stored) {
       log.error('No snapshot found. Run `goodbot generate --analyze` first.');
-      process.exit(1);
+      return null;
     }
 
-    const spinner = ora('Analyzing current codebase...').start();
+    const scan = await runFullScan(projectRoot);
+    let config;
+    try { config = await loadConfig(projectRoot); } catch { /* no config */ }
 
+    const fullAnalysis = await runFullAnalysis(projectRoot, scan.structure, config);
+    const gitHistory = await analyzeGitHistory(projectRoot, 500, scan.structure.srcRoot ?? undefined);
+    const temporalCouplings = findTemporalCoupling(gitHistory.commits, 3, 0.5, scan.structure.srcRoot ?? undefined);
+
+    const context = buildContext(config!, undefined, fullAnalysis, gitHistory, temporalCouplings);
+    const currentSnapshot = buildSnapshot(
+      context.analysisInsights!,
+      config?.conventions.customRules ?? [],
+      fullAnalysis.dependency.modules.length,
+      fullAnalysis.dependency.filesParsed,
+    );
+
+    return compareFreshness(stored, currentSnapshot);
+  };
+
+  let lastStatus: string | undefined;
+
+  const tick = async () => {
     try {
-      const scan = await runFullScan(projectRoot);
-      let config;
-      try { config = await loadConfig(projectRoot); } catch { /* no config */ }
+      const report = await runOnce();
+      if (!report) return;
 
-      spinner.text = 'Running full analysis...';
-      const fullAnalysis = await runFullAnalysis(projectRoot, scan.structure, config);
+      // Clear screen for clean output
+      process.stdout.write('\x1B[2J\x1B[0f');
 
-      spinner.text = 'Analyzing git history...';
-      const gitHistory = await analyzeGitHistory(projectRoot, 500, scan.structure.srcRoot ?? undefined);
-      const temporalCouplings = findTemporalCoupling(gitHistory.commits, 3, 0.5, scan.structure.srcRoot ?? undefined);
+      const now = new Date().toLocaleTimeString();
+      console.log(`  ${chalk.bold('goodbot freshness')} ${chalk.dim(`(${now}, every ${intervalSec}s)`)}`);
+      console.log();
 
-      // Build current snapshot from fresh analysis
-      const context = buildContext(config!, undefined, fullAnalysis, gitHistory, temporalCouplings);
-      const currentSnapshot = buildSnapshot(
-        context.analysisInsights!,
-        config?.conventions.customRules ?? [],
-        fullAnalysis.dependency.modules.length,
-        fullAnalysis.dependency.filesParsed,
-      );
-
-      spinner.succeed('Analysis complete');
-
-      // Compare
-      const report = compareFreshness(stored, currentSnapshot);
-
-      if (opts.json) {
+      if (json) {
         console.log(JSON.stringify(report, null, 2));
       } else {
         renderReport(report);
       }
 
-      // Exit 1 if degraded (useful for CI)
-      if (report.overallStatus === 'degraded') {
-        process.exit(1);
+      // Alert on status change
+      if (lastStatus && lastStatus !== report.overallStatus) {
+        if (report.overallStatus === 'degraded') {
+          console.log();
+          log.error('Status changed to DEGRADED');
+        } else if (report.overallStatus === 'fresh' && lastStatus !== 'fresh') {
+          console.log();
+          log.success('Guardrails are now fresh!');
+        }
       }
+      lastStatus = report.overallStatus;
     } catch (err) {
-      spinner.fail('Freshness check failed');
       log.error(err instanceof Error ? err.message : String(err));
-      process.exit(1);
     }
+  };
+
+  // Run immediately, then on interval
+  await tick();
+
+  const timer = setInterval(tick, intervalSec * 1000);
+
+  process.on('SIGINT', () => {
+    clearInterval(timer);
+    console.log('\n');
+    log.info('Freshness watch stopped.');
+    process.exit(0);
   });
+
+  // Keep process alive
+  await new Promise(() => {});
+}
 
 function renderReport(report: FreshnessReport): void {
   const ageLabel = report.daysSinceGeneration === 0

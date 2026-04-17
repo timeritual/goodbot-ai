@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import { runFullScan } from '../scanners/index.js';
 import { runFullAnalysis } from '../analyzers/index.js';
 import { loadConfig } from '../config/index.js';
+import { checkBudget } from './analyze.js';
 
 export const scoreCommand = new Command('score')
   .description('Show your project health grade — fast, one line')
@@ -20,15 +21,28 @@ export const scoreCommand = new Command('score')
       if (!opts.color) {
         // Plain output for scripts: "B+ 80"
         console.log(`${grade} ${score}`);
-        return;
+      } else {
+        const color = grade.startsWith('A') ? chalk.green
+          : grade.startsWith('B') ? chalk.cyan
+          : grade.startsWith('C') ? chalk.yellow
+          : chalk.red;
+
+        console.log(`${color.bold(grade)} ${chalk.dim(`(${score}/100)`)}`);
       }
 
-      const color = grade.startsWith('A') ? chalk.green
-        : grade.startsWith('B') ? chalk.cyan
-        : grade.startsWith('C') ? chalk.yellow
-        : chalk.red;
-
-      console.log(`${color.bold(grade)} ${chalk.dim(`(${score}/100)`)}`);
+      // Check budget if configured
+      if (config) {
+        const budgetEntries = checkBudget(result, config);
+        const overBudget = budgetEntries.filter(e => e.overBudget);
+        if (overBudget.length > 0) {
+          if (opts.color) {
+            for (const entry of overBudget) {
+              console.log(chalk.red(`  ✗ ${entry.category}: ${entry.actual}/${entry.budget} (over budget)`));
+            }
+          }
+          process.exit(1);
+        }
+      }
 
       // Exit with 1 if grade is D or F (useful for git hooks)
       if (grade === 'D' || grade === 'F') {

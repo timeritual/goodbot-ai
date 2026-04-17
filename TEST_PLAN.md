@@ -63,13 +63,16 @@ npx goodbot-ai trend --record
 ### Then check
 ```bash
 npx goodbot-ai diff --base main
+npx goodbot-ai diff --base main --freshness
 npx goodbot-ai freshness
+npx goodbot-ai fix --dry-run
 ```
 
 ### What to observe
 - [ ] Does `diff` catch the violations in changed files?
-- [ ] Does the Guardrail Impact section in `diff` show meaningful claim drift?
+- [ ] Does `diff --freshness` show meaningful claim drift in the Guardrail Impact section?
 - [ ] Does `freshness` correctly show degraded claims?
+- [ ] Does `fix --dry-run` suggest sensible fixes (barrel rewrites, dead export removal)?
 - [ ] Is the output clear enough that you'd act on it?
 - [ ] Revert the intentional drift after testing
 
@@ -82,15 +85,17 @@ Let the AI agent read the CODING_GUIDELINES.md and build something non-trivial (
 
 ### After the session
 ```bash
-npx goodbot-ai diff --base main
+npx goodbot-ai diff --base main --freshness
 npx goodbot-ai freshness
 npx goodbot-ai analyze
+npx goodbot-ai fix --dry-run
 ```
 
 ### What to observe
 - [ ] Did the AI agent follow the guardrails? Which rules did it follow/ignore?
 - [ ] Did the agent introduce violations that goodbot detects?
 - [ ] Are there patterns the agent established that the guardrails don't cover?
+- [ ] Does `fix --dry-run` catch fixable issues the agent introduced?
 - [ ] Would a `goodbot generate --analyze --force` produce meaningfully different guardrails now?
 
 ---
@@ -110,6 +115,7 @@ npx goodbot-ai freshness
 npx goodbot-ai trend --effectiveness
 npx goodbot-ai analyze --git
 npx goodbot-ai trend
+npx goodbot-ai fix --dry-run
 ```
 
 ### Regenerate and compare
@@ -151,6 +157,13 @@ diff CODING_GUIDELINES.old.md CODING_GUIDELINES.md
 ### UX
 9. **Is the output readable?** Too verbose? Too terse? Wrong information highlighted?
 10. **CLI discoverability** — did you need to check `--help` or README to remember commands?
+
+### New in v0.4.0
+11. **Violation budgets** — Configure `analysis.budget` in config. Does the budget system add value? Is the pass/fail threshold useful?
+12. **`fix` command** — Run `fix --dry-run`. Are the suggested barrel rewrites and dead export removals correct? Any false positives?
+13. **`freshness --watch`** — Run `freshness --watch 30`. Is continuous monitoring useful during development?
+14. **`diff --freshness`** — Is the opt-in freshness flag the right default? Or should freshness always show?
+15. **Custom rules section** — If you define `customRulesConfig` rules, do they appear correctly in their own section in `analyze` output?
 
 ---
 

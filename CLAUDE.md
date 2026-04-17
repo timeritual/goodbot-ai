@@ -14,12 +14,11 @@ All architectural rules, import conventions, verification checklists, and code s
 - Test: `npm test`
 - Build: `npm run build`
 
-## Current Health: B+ (81/100)
+## Current Health: A (85/100)
 
 Top issues to avoid making worse:
 - **Dead exports** — Search for existing functions before creating new ones
 - **Code duplication** — Reuse existing logic, don't copy-paste
-- **1 barrel violations** — Import from barrel files, not internal files
 - **High complexity files** — Keep branching logic minimal
 
 See `CODING_GUIDELINES.md` for full details on each issue.

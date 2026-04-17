@@ -102,7 +102,7 @@ Depend on **abstractions**, not concretions.
 
 ## Known Issues in This Codebase
 
-> These rules are generated from a live analysis of this project (grade: **B+**, score: 81/100). Pay special attention to these areas.
+> These rules are generated from a live analysis of this project (grade: **A**, score: 85/100). Pay special attention to these areas.
 
 ### Dead Exports — Do Not Create Unused Code
 
@@ -111,9 +111,8 @@ This project has unused exports that nothing imports. Before creating a new expo
 2. If you find one, import and use it instead of writing a new one
 3. If no existing function fits, create the new export and ensure at least one consumer imports it
 
-- **config** has unused exports: `GoodbotConfigSchema`, `type`, `type`, `type`, `configDir`, `checksumsPath`
-- **analyzers** has unused exports: `type`, `type`, `type`, `type`
-- **generators** has unused exports: `GeneratorContext`, `GeneratedFile`, `renderTemplate`
+- **config** has unused exports: `type`, `type`, `type`
+- **analyzers** has unused exports: `type`, `type`, `type`, `type`, `type`, `runDependencyAnalysis`
 
 ### Code Duplication — Reuse Existing Logic
 
@@ -123,26 +122,21 @@ Duplicated code blocks have been detected across files. Before writing new logic
 3. If two files contain similar logic, refactor into a shared helper
 
 
-### Barrel Import Violations — Use Public APIs
-
-This project has **1** barrel bypass violation(s). Always import from the module's barrel file (`index.ts`), never from internal files:
-- **Correct:** `import { Thing } from '../services'`
-- **Wrong:** `import { Thing } from '../services/thingService'`
 
 
 ### High Complexity — Keep Functions Simple
 
 These files have high cyclomatic complexity and need careful attention:
-- `src/analyzers/complexity-checker.ts`
-- `src/analyzers/custom-rules.ts`
-- `src/analyzers/cycles.ts`
-- `src/analyzers/dead-export-checker.ts`
-- `src/analyzers/duplication-checker.ts`
-- `src/analyzers/git-history.ts`
-- `src/analyzers/health-score.ts`
-- `src/analyzers/import-parser.ts`
-- `src/analyzers/module-resolver.ts`
-- `src/analyzers/passthrough-checker.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/complexity-checker.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/custom-rules.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/cycles.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/dead-export-checker.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/duplication-checker.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/git-history.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/health-score.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/import-parser.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/module-resolver.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/passthrough-checker.ts`
 
 When modifying these files, look for opportunities to extract helper functions. New code should keep branching logic (if/else/for/while/ternary) minimal.
 
@@ -159,22 +153,21 @@ When adding to these modules, focus on adding implementation depth (more logic b
 These files change frequently and are complex. Extra care is needed when modifying them — they are the most likely source of regressions:
 - `src/commands/analyze.ts`
 - `src/analyzers/index.ts`
-- `src/analyzers/solid.ts`
-- `src/generators/context-builder.ts`
 - `src/index.ts`
-- `src/commands/init.ts`
+- `src/analyzers/solid.ts`
 - `src/commands/generate.ts`
-- `src/generators/types.ts`
-- `src/generators/index.ts`
-- `src/commands/report.ts`
+- `src/commands/init.ts`
+- `src/commands/diff.ts`
+- `src/commands/ci.ts`
+- `src/generators/context-builder.ts`
+- `src/commands/fix.ts`
 
 Before modifying a hotspot file, understand its full scope and run all tests.
 
 ### Temporal Coupling — Hidden Dependencies
 
 These file pairs always change together but are in different modules. This often means they share logic that should be extracted:
-- `src/analyzers/index.ts` ↔ `src/index.ts` (coupling: 0.6)
-- `src/analyzers/index.ts` ↔ `src/commands/analyze.ts` (coupling: 0.5)
+- `src/analyzers/index.ts` ↔ `src/commands/analyze.ts` (coupling: 0.57)
 
 If you modify one file in a coupled pair, check whether the other needs a matching change.
 
@@ -182,16 +175,16 @@ If you modify one file in a coupled pair, check whether the other needs a matchi
 ### Oversized Files
 
 These files exceed the size threshold and should not grow further:
-- `src/analyzers/passthrough-checker.ts`
-- `src/commands/analyze.ts`
-- `src/commands/init.ts`
-- `src/analyzers/complexity-checker.ts`
-- `src/analyzers/custom-rules.ts`
-- `src/analyzers/cycles.ts`
-- `src/analyzers/health-score.ts`
-- `src/analyzers/import-parser.ts`
-- `src/analyzers/module-resolver.ts`
-- `src/analyzers/temporal-coupling.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/passthrough-checker.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/commands/analyze.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/commands/fix.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/commands/init.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/complexity-checker.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/custom-rules.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/cycles.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/health-score.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/import-parser.ts`
+- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/module-resolver.ts`
 
 When modifying these files, look for opportunities to extract functionality into separate files rather than adding more code.
 

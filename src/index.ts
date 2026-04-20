@@ -23,7 +23,7 @@ const program = new Command();
 program
   .name('goodbot')
   .description('Auto-generate AI agent guardrail files for your project')
-  .version('0.5.1');
+  .version('0.5.2');
 
 program.addCommand(scanCommand);
 program.addCommand(initCommand);

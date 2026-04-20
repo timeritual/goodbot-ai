@@ -18,7 +18,7 @@ Business logic **must NOT** live in: {{#each businessLogic.forbiddenIn}}{{this}}
 {{/each}}
 {{#each businessLogic.forbiddenIn}}
 {{#if ../isNode}}
-| **{{this}}** | Request/response handling, delegation to services | Direct database access, business rules |
+| **{{this}}** | {{layerShould this}} | {{layerShouldNot this}} |
 {{else}}
 | **{{this}}** | UI rendering, state wiring, navigation | Direct API calls, data transformation |
 {{/if}}

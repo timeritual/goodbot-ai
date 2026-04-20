@@ -66,6 +66,7 @@ function makeAnalysis(
       grade: 'A',
       score: 90,
       breakdown: { dependencies: 90, stability: 90, solid: 90, architecture: 90 },
+      contributors: [],
     },
   };
 }

@@ -59,6 +59,12 @@ export interface GeneratorContext {
   hasAnalysis: boolean;
   // Full analysis insights for adaptive guardrails
   analysisInsights?: AnalysisInsights;
+  // Framework-specific patterns detected by scanner
+  frameworkPatterns?: {
+    conventions: Array<{ name: string; description: string; evidence: string }>;
+    structuralNotes: string[];
+  };
+  hasFrameworkPatterns: boolean;
 }
 
 /** Structured analysis data for adaptive guardrail generation */

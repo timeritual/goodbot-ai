@@ -53,6 +53,7 @@ export function buildPresetConfig(
       agentsMd: true,
       cursorignore: true,
       codingGuidelines: true,
+      existingFileStrategy: 'merge',
     },
     conventions: {
       mainBranch: 'main',

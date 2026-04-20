@@ -116,6 +116,15 @@ export function renderHealthGrade(health: HealthScore): void {
   console.log(`  ${chalk.dim('Stability'.padEnd(16))} ${bar(health.breakdown.stability)} ${chalk.dim(String(health.breakdown.stability))}`);
   console.log(`  ${chalk.dim('SOLID'.padEnd(16))} ${bar(health.breakdown.solid)} ${chalk.dim(String(health.breakdown.solid))}`);
   console.log(`  ${chalk.dim('Architecture'.padEnd(16))} ${bar(health.breakdown.architecture)} ${chalk.dim(String(health.breakdown.architecture))}`);
+
+  if (health.contributors.length > 0) {
+    console.log();
+    console.log(`  ${chalk.dim('Biggest issues:')}`);
+    for (const c of health.contributors.slice(0, 5)) {
+      const countStr = String(c.count).padStart(4);
+      console.log(`    ${chalk.red(countStr)}  ${c.label}`);
+    }
+  }
 }
 
 // ─── Dependency Analysis ──────────────────────────────────

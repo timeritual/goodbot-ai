@@ -111,22 +111,25 @@ Full interactive mode:
 $ goodbot init
 
 ✔ Scan complete
+⚠ Found existing agent files: CLAUDE.md, .cursorrules
+? How should `goodbot generate` handle these files? Merge — prepend goodbot section, keep your content
 ? Project name: my-app
 ? Detected react-native (typescript). Is this correct? Yes
 ? Main branch name: main
-? Detected 13 directories under src/. Define layer architecture? Yes
-? Require barrel imports for cross-layer access? Always (ESLint enforced)
-? Where should business logic live? services
-? Type check command: npx tsc --noEmit
-? Lint command: npx eslint src/
-? Test command: npm test
-? Which files to generate? CLAUDE.md, .cursorrules, .windsurfrules, AGENTS.md, .cursorignore, CODING_GUIDELINES.md
-? Add custom rules/conventions? No
+...
 
 ✓ Config saved to .goodbot/config.json
 ```
 
-Saves everything to `.goodbot/config.json` — your single source of truth.
+If existing agent files are detected (CLAUDE.md, .cursorrules, etc.), init asks whether to **merge** (prepend goodbot section, keep your content), **overwrite**, or **skip** them during generation. The default is merge.
+
+Preview a preset before committing:
+
+```bash
+goodbot init --preset recommended --dry-run
+```
+
+Saves everything to `.goodbot/config.json` — your single source of truth. Also creates `.goodbot/.gitignore` to keep local state files out of version control.
 
 ### `goodbot generate`
 
@@ -217,6 +220,11 @@ $ goodbot analyze
   Stability        ██████████ 100
   SOLID            █████████░ 91
   Architecture     ███████░░░ 70
+
+  Biggest issues:
+      2  Circular dependencies
+      8  Oversized files
+      1  Layer violations
 
 Dependency Analysis
 ──────────────────────────────────────────────────
@@ -599,7 +607,7 @@ Includes a stability metrics table and lists any circular dependencies or layer 
 
 | File | Who reads it | Purpose |
 |------|-------------|---------|
-| `CODING_GUIDELINES.md` | All agents + humans | Architecture, import rules, SOLID + design principles, business logic placement, verification checklist |
+| `CODING_GUIDELINES.md` | All agents + humans | Architecture, framework conventions, SOLID + design principles, business logic placement, verification checklist |
 | `CLAUDE.md` | Claude Code, Claude in IDEs | Points to CODING_GUIDELINES.md + quick reference |
 | `.cursorrules` | Cursor AI | Points to CODING_GUIDELINES.md |
 | `.windsurfrules` | Windsurf AI | Points to CODING_GUIDELINES.md |
@@ -609,14 +617,15 @@ Includes a stability metrics table and lists any circular dependencies or layer 
 
 goodbot also generates internal tracking files in `.goodbot/`:
 
-| File | Purpose |
-|------|---------|
-| `.goodbot/config.json` | Your single source of truth — all rules and settings |
-| `.goodbot/checksums.json` | Hashes of generated files (for drift detection via `check`) |
-| `.goodbot/snapshot.json` | Analysis snapshot (for freshness tracking via `freshness`) |
-| `.goodbot/history.json` | Health score history (for trend tracking via `trend`) |
+| File | Purpose | Commit? |
+|------|---------|---------|
+| `.goodbot/config.json` | Your single source of truth — all rules and settings | **Yes** — shared across the team |
+| `.goodbot/checksums.json` | Hashes of generated files (for drift detection via `check`) | No — local state |
+| `.goodbot/snapshot.json` | Analysis snapshot (for freshness tracking via `freshness`) | No — local state |
+| `.goodbot/history.json` | Health score history (for trend tracking via `trend`) | No — local state |
+| `.goodbot/.gitignore` | Auto-created by `goodbot init` to gitignore local state files | **Yes** |
 
-The key insight: **CODING_GUIDELINES.md is the single source of truth**. All agent-specific files simply point to it. This eliminates drift between agents and keeps maintenance to one file. The generated guidelines include SOLID principles tailored to your framework and design principles that counteract common AI agent failure modes.
+The key insight: **CODING_GUIDELINES.md is the single source of truth**. All agent-specific files simply point to it. This eliminates drift between agents and keeps maintenance to one file. The generated guidelines include SOLID principles tailored to your framework, design principles that counteract common AI agent failure modes, and auto-detected framework conventions specific to your codebase.
 
 ---
 
@@ -960,8 +969,9 @@ goodbot hooks install
 
 | Command | Description |
 |---------|-------------|
-| `goodbot init` | Interactive project setup (or `--preset strict\|recommended\|relaxed`) |
-| `goodbot generate` | Generate AI agent guardrail files (auto-analyzes on first run) |
+| `goodbot init` | Interactive project setup (or `--preset strict\|recommended\|relaxed`, `--dry-run` to preview) |
+| `goodbot generate` | Generate AI agent guardrail files (auto-analyzes on first run, merges with existing files) |
+| `goodbot presets` | Compare available presets side-by-side |
 | `goodbot check` | Detect drift in generated files + snapshot age |
 | `goodbot freshness` | Compare guardrail claims against current codebase reality (`--watch` for continuous) |
 | `goodbot hooks` | Install/uninstall git hooks for automatic freshness checks |

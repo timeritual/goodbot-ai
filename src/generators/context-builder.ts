@@ -1,5 +1,6 @@
 import type { GoodbotConfig } from '../config/index.js';
 import type { DependencyAnalysisSummary, FullAnalysis, GitHistoryAnalysis, TemporalCoupling } from '../analyzers/index.js';
+import type { FrameworkPatterns } from '../scanners/index.js';
 import type { GeneratorContext, AnalysisInsights } from './types.js';
 
 function buildLayerDiagram(
@@ -30,6 +31,7 @@ export function buildContext(
   fullAnalysis?: FullAnalysis,
   gitHistory?: GitHistoryAnalysis,
   temporalCouplings?: TemporalCoupling[],
+  frameworkPatterns?: FrameworkPatterns,
 ): GeneratorContext {
   const { project, architecture, businessLogic, verification, conventions, ignore } = config;
 
@@ -73,6 +75,10 @@ export function buildContext(
     } : undefined,
     hasAnalysis: !!analysisSummary,
     analysisInsights: fullAnalysis ? buildAnalysisInsights(fullAnalysis, gitHistory, temporalCouplings) : undefined,
+    frameworkPatterns: frameworkPatterns && (frameworkPatterns.conventions.length > 0 || frameworkPatterns.structuralNotes.length > 0)
+      ? frameworkPatterns
+      : undefined,
+    hasFrameworkPatterns: !!frameworkPatterns && (frameworkPatterns.conventions.length > 0 || frameworkPatterns.structuralNotes.length > 0),
   };
 }
 

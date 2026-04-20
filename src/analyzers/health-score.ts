@@ -3,6 +3,7 @@ import type {
   SolidAnalysis,
   HealthScore,
   HealthGrade,
+  HealthContributor,
 } from './types.js';
 
 /**
@@ -58,6 +59,19 @@ export function calculateHealthScore(
     architecture * 0.25,
   );
 
+  // Build contributors: what's costing the most points?
+  const solidViolations = solid.violations.filter(v => v.severity !== 'info');
+  const contributors: HealthContributor[] = [
+    { label: 'Circular dependencies', count: dep.circularDependencies.length, pointsLost: dep.circularDependencies.length * 25 },
+    { label: 'Stability violations', count: dep.stabilityViolations.length, pointsLost: dep.stabilityViolations.length * 15 },
+    { label: 'Layer violations', count: dep.layerViolations.length, pointsLost: dep.layerViolations.length * 8 },
+    { label: 'Barrel violations', count: dep.barrelViolations.length, pointsLost: dep.barrelViolations.length * 3 },
+    { label: 'Oversized files', count: solidViolations.filter(v => v.principle === 'SRP').length, pointsLost: Math.max(0, 100 - solid.scores.srp) },
+    { label: 'Dead exports', count: solidViolations.filter(v => v.message.includes('Dead export')).length, pointsLost: solidViolations.filter(v => v.message.includes('Dead export')).length * 3 },
+    { label: 'Interface bloat', count: solidViolations.filter(v => v.principle === 'ISP').length, pointsLost: Math.max(0, 100 - solid.scores.isp) },
+    { label: 'Dependency inversion', count: solidViolations.filter(v => v.principle === 'DIP').length, pointsLost: Math.max(0, 100 - solid.scores.dip) },
+  ].filter(c => c.count > 0).sort((a, b) => b.pointsLost - a.pointsLost);
+
   return {
     grade: scoreToGrade(score),
     score,
@@ -67,6 +81,7 @@ export function calculateHealthScore(
       solid: solidScore,
       architecture,
     },
+    contributors,
   };
 }
 

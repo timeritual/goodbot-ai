@@ -44,6 +44,7 @@ export const GoodbotConfigSchema = z.object({
     agentsMd: z.boolean().default(true),
     cursorignore: z.boolean().default(true),
     codingGuidelines: z.boolean().default(true),
+    existingFileStrategy: z.enum(['merge', 'overwrite', 'skip']).default('merge'),
   }).default({}),
   conventions: z.object({
     mainBranch: z.string().default('main'),

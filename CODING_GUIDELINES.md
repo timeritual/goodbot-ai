@@ -46,6 +46,7 @@ Business logic **must NOT** live in: routes, controllers
 | **routes** | UI rendering, state wiring, navigation | Direct API calls, data transformation |
 | **controllers** | UI rendering, state wiring, navigation | Direct API calls, data transformation |
 
+
 ### Red Flags
 
 If you see any of these patterns in code you're writing, stop and reconsider:

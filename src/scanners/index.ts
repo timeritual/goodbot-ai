@@ -4,6 +4,7 @@ import { detectFramework } from './framework.js';
 import { detectLanguage } from './language.js';
 import { analyzeStructure } from './structure.js';
 import { detectVerification } from './verification.js';
+import { detectFrameworkPatterns } from './patterns.js';
 import type { ScanResult } from './types.js';
 
 export type { ScanResult } from './types.js';
@@ -15,6 +16,8 @@ export type {
   DetectedLayer,
   StructureAnalysis,
   VerificationCommands,
+  FrameworkPatterns,
+  FrameworkConvention,
 } from './types.js';
 
 interface PackageJson {
@@ -29,7 +32,10 @@ export async function runFullScan(projectRoot: string): Promise<ScanResult> {
     detectVerification(projectRoot),
   ]);
 
-  const pkg = await safeReadJson<PackageJson>(path.join(projectRoot, 'package.json'));
+  const [pkg, frameworkPatterns] = await Promise.all([
+    safeReadJson<PackageJson>(path.join(projectRoot, 'package.json')),
+    detectFrameworkPatterns(projectRoot, framework.framework, structure.srcRoot),
+  ]);
   const projectName = pkg?.name ?? path.basename(projectRoot);
 
   return {
@@ -39,5 +45,6 @@ export async function runFullScan(projectRoot: string): Promise<ScanResult> {
     language,
     structure,
     verification,
+    frameworkPatterns,
   };
 }

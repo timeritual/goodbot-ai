@@ -20,6 +20,27 @@ Higher layers may import from lower layers, never the reverse.
 This project uses a {{project.framework}} ({{project.language}}) stack.
 {{/if}}
 
+{{#if hasFrameworkPatterns}}
+## Framework Conventions (Auto-Detected)
+
+These patterns were detected in the codebase. Follow them when writing new code.
+
+{{#each frameworkPatterns.conventions}}
+### {{name}}
+{{description}}
+{{#if evidence}}
+_Found in: {{evidence}}_
+{{/if}}
+
+{{/each}}
+{{#if frameworkPatterns.structuralNotes}}
+**Structural notes:**
+{{#each frameworkPatterns.structuralNotes}}
+- {{this}}
+{{/each}}
+{{/if}}
+{{/if}}
+
 {{#if hasRedFlags}}
 ### Red Flags
 

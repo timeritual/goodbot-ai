@@ -47,6 +47,11 @@ export const generateCommand = new Command('generate')
     let gitHistory: GitHistoryAnalysis | undefined;
     let temporalCouplings: TemporalCoupling[] | undefined;
 
+    // Always scan for framework patterns
+    const scanSpinner = ora('Scanning project...').start();
+    const scan = await runFullScan(projectRoot);
+    scanSpinner.succeed('Scan complete');
+
     // Auto-analyze on first run (no existing snapshot)
     let shouldAnalyze = opts.analyze;
     if (!shouldAnalyze) {
@@ -60,7 +65,6 @@ export const generateCommand = new Command('generate')
     if (shouldAnalyze) {
       const analyzeSpinner = ora('Analyzing project for adaptive guardrails...').start();
       try {
-        const scan = await runFullScan(projectRoot);
         fullAnalysis = await runFullAnalysis(projectRoot, scan.structure, config);
         analyzeSpinner.text = 'Analyzing git history...';
         gitHistory = await analyzeGitHistory(projectRoot, 500, scan.structure.srcRoot ?? undefined);
@@ -78,7 +82,7 @@ export const generateCommand = new Command('generate')
     const spinner = ora('Generating files...').start();
 
     try {
-      const files = await generateAll(config, fullAnalysis, gitHistory, temporalCouplings);
+      const files = await generateAll(config, fullAnalysis, gitHistory, temporalCouplings, scan.frameworkPatterns);
       spinner.succeed(`Generated ${files.length} files`);
 
       const existingChecksums = await loadChecksums(projectRoot);
@@ -94,8 +98,22 @@ export const generateCommand = new Command('generate')
           existing.includes(GOODBOT_START)
         );
 
+        // Respect config strategy for existing files not previously generated
+        const strategy = config.agentFiles.existingFileStrategy ?? 'merge';
+        const isUserFile = file.mergeWithExisting && existing !== null && !previouslyGenerated;
+
+        // Skip: don't touch pre-existing user files
+        if (isUserFile && strategy === 'skip') {
+          if (opts.dryRun) {
+            log.dim(`  ${file.fileName} ${chalk.dim('(would skip — existing file)')}`);
+          } else {
+            log.dim(`  ${file.fileName} — skipped (existing file)`);
+          }
+          continue;
+        }
+
         // Merge: prepend goodbot content to pre-existing user files
-        const shouldMerge = file.mergeWithExisting && existing !== null && !previouslyGenerated;
+        const shouldMerge = isUserFile && strategy === 'merge';
         const finalContent = shouldMerge
           ? mergeGoodbotContent(file.content, existing)
           : file.content;

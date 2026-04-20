@@ -138,6 +138,12 @@ export const DEFAULT_THRESHOLDS: AnalysisThresholds = {
 
 export type HealthGrade = 'A+' | 'A' | 'B+' | 'B' | 'C+' | 'C' | 'D' | 'F';
 
+export interface HealthContributor {
+  label: string;
+  count: number;
+  pointsLost: number;
+}
+
 export interface HealthScore {
   grade: HealthGrade;
   score: number;        // 0-100
@@ -147,6 +153,7 @@ export interface HealthScore {
     solid: number;
     architecture: number;
   };
+  contributors: HealthContributor[];
 }
 
 // ─── Full Analysis Result ─────────────────────────────────

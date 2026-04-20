@@ -50,6 +50,17 @@ export interface VerificationCommands {
   build: string | null;
 }
 
+export interface FrameworkConvention {
+  name: string;
+  description: string;
+  evidence: string;
+}
+
+export interface FrameworkPatterns {
+  conventions: FrameworkConvention[];
+  structuralNotes: string[];
+}
+
 export interface ScanResult {
   projectRoot: string;
   projectName: string;
@@ -57,4 +68,5 @@ export interface ScanResult {
   language: LanguageDetection;
   structure: StructureAnalysis;
   verification: VerificationCommands;
+  frameworkPatterns: FrameworkPatterns;
 }

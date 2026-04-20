@@ -27,6 +27,7 @@ function makeAnalysis(overrides: {
       grade: 'A+',
       score: 100,
       breakdown: { dependencies: 100, stability: 100, solid: 100, architecture: 100 },
+      contributors: [],
     },
   };
 }

@@ -16,6 +16,7 @@ import { reportCommand } from './commands/report.js';
 import { onboardCommand } from './commands/onboard.js';
 import { freshnessCommand } from './commands/freshness.js';
 import { hooksCommand } from './commands/hooks.js';
+import { presetsCommand } from './commands/presets.js';
 
 const program = new Command();
 
@@ -41,5 +42,6 @@ program.addCommand(trendCommand);
 program.addCommand(syncCommand);
 program.addCommand(reportCommand);
 program.addCommand(onboardCommand);
+program.addCommand(presetsCommand);
 
 program.parse();

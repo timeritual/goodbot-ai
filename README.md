@@ -34,7 +34,7 @@ Every team using AI agents ends up writing the same boilerplate: `CLAUDE.md`, `.
 
 ## The Solution
 
-**goodbot** scans your codebase, detects your framework, language, architecture, and conventions — then generates a complete set of AI agent guardrail files from a single source of truth. It continuously analyzes your codebase for architectural violations, SOLID principles, code duplication, dead exports, and complexity — and gives you a single health grade.
+**goodbot** scans your codebase, detects your framework, language, architecture, and conventions — then generates a complete set of AI agent guardrail files from a single source of truth. Generated content is fully data-driven: SOLID examples, business logic tables, and layer descriptions are all tailored to your framework without hardcoded template logic. It continuously analyzes your codebase for architectural violations, design principles, code duplication, dead exports, and complexity — and gives you a single health grade.
 
 More importantly, **goodbot detects when your guardrails go stale**. As your codebase evolves, the rules drift from reality. goodbot tracks what your guardrails claim vs what the codebase actually looks like, and surfaces the gap — in your terminal, in PR comments, and via git hooks.
 
@@ -545,17 +545,32 @@ The grade is a weighted composite of four dimensions:
 
 goodbot generates two sets of design principles in CODING_GUIDELINES.md — **SOLID** for structural correctness and **design principles** (inspired by *A Philosophy of Software Design*) that counteract common AI agent failure modes.
 
+All generated principles are **data-driven** — examples, layer names, and descriptions are tailored to your framework. A NestJS project gets "Controllers should not know about low-level implementation details (database drivers, ORMs). Use dependency injection." while a React project gets "Pages and components should not know about low-level implementation details (API clients, storage)." No template branching — just different data per framework.
+
 ### SOLID Principles
 
-Three principles are statically analyzed; all five are generated as guidelines:
+Three principles are statically analyzed; all five are generated as guidelines with framework-appropriate examples:
 
 | Principle | Checked | What it detects |
 |-----------|---------|-----------------|
 | **S** — Single Responsibility | Yes | Files over 300 lines, files importing from 4+ modules (mixed concerns) |
-| **O** — Open/Closed | Guidelines only | Generated guidelines teach composition over modification |
+| **O** — Open/Closed | Guidelines only | Tailored to framework (e.g., "Use interceptors, guards, strategy patterns" for NestJS) |
 | **L** — Liskov Substitution | Guidelines only | Generated guidelines teach contract honoring |
 | **I** — Interface Segregation | Yes | Barrel files exporting 15+ symbols (fat interfaces) |
 | **D** — Dependency Inversion | Yes | Importing concrete files when interfaces.ts exists in the target module |
+
+### Business Logic Placement
+
+Each layer gets a specific description based on its role in your framework:
+
+| Layer (NestJS example) | Should Contain | Should NOT Contain |
+|------------------------|---------------|-------------------|
+| **services** | Business rules, data transformation, orchestration | HTTP/request handling, response formatting |
+| **controllers** | Request/response handling, delegation to services | Direct database access, business rules |
+| **guards** | Authorization, access control, role checks | Business logic, database access |
+| **interceptors** | Cross-cutting concerns (logging, caching, response transforms) | Business logic, database access |
+
+These descriptions come from framework defaults — not hardcoded template logic. Adding a new framework only requires adding a data entry to `frameworkDefaults`.
 
 ### AI-Focused Design Principles
 
@@ -627,7 +642,7 @@ goodbot also generates internal tracking files in `.goodbot/`:
 | `.goodbot/history.json` | Health score history (for trend tracking via `trend`) | No — local state |
 | `.goodbot/.gitignore` | Auto-created by `goodbot init` to gitignore local state files | **Yes** |
 
-The key insight: **CODING_GUIDELINES.md is the single source of truth**. All agent-specific files simply point to it. This eliminates drift between agents and keeps maintenance to one file. The generated guidelines include SOLID principles tailored to your framework, design principles that counteract common AI agent failure modes, and auto-detected framework conventions specific to your codebase.
+The key insight: **CODING_GUIDELINES.md is the single source of truth**. All agent-specific files simply point to it. This eliminates drift between agents and keeps maintenance to one file. Generated content is fully data-driven — SOLID examples, business logic descriptions, and layer roles are all tailored to your framework without any template branching. Auto-detected framework conventions add project-specific rules on top.
 
 ---
 
@@ -700,23 +715,23 @@ Edit this file directly or re-run `goodbot init` to regenerate it.
 
 **Deep analysis** (import graphs, SOLID checks, dependency cycles, complexity, duplication, dead exports, health grading) is currently **TypeScript/JavaScript only**. Support for Python and Go is planned.
 
-**Framework detection and guardrail generation** work for all frameworks below — goodbot detects your stack and generates framework-specific red flags, guidelines, and auto-detected conventions. Projects in any language get guardrail files; TS/JS projects additionally get adaptive guardrails powered by live analysis.
+**Framework detection and guardrail generation** work for all frameworks below. Each framework gets tailored SOLID examples, layer descriptions, red flags, and (where supported) auto-detected conventions. All of this is data-driven — templates are framework-agnostic and adding a new framework only requires a data entry.
 
-| Framework | Detection | Red flags | Convention detection | Deep analysis |
-|-----------|-----------|-----------|---------------------|:---:|
-| React | `package.json → react` | Business logic in components, fetch in useEffect | State management (Redux/Zustand/Context), custom hooks | Yes |
-| React Native | `package.json → react-native` | AsyncStorage misuse, fetch in screens | State management, custom hooks | Yes |
-| Next.js | `package.json → next` | Secrets in client code, missing caching | App/Pages router, server actions, state management | Yes |
-| NestJS | `package.json → @nestjs/core` | Logic in controllers, missing DTOs | Modules, guards, repositories, entities, DTOs, interceptors, pipes | Yes |
-| Express | `package.json → express` | Logic in route handlers, missing validation | Middleware files, router organization | Yes |
-| Angular | `package.json → @angular/core` | Logic in components, direct HTTP in components, missing DI | — | Yes |
-| Node.js | `package.json` (fallback) | Logic in route handlers | — | Yes |
-| Django | `requirements.txt → django` | Logic in views, querysets in templates | — | Coming soon |
-| Flask | `requirements.txt → flask` | Logic in routes, missing validation | — | Coming soon |
-| FastAPI | `requirements.txt → fastapi` | Logic in endpoints, missing Pydantic models | — | Coming soon |
-| Go | `go.mod` | Logic in handlers, missing error wrapping | — | Coming soon |
+| Framework | Detection | Tailored layer descriptions | Convention detection | Deep analysis |
+|-----------|-----------|---------------------------|---------------------|:---:|
+| React | `package.json → react` | components, pages, hooks, services | State management (Redux/Zustand/Context), custom hooks | Yes |
+| React Native | `package.json → react-native` | screens, components, hooks, services | State management, custom hooks | Yes |
+| Next.js | `package.json → next` | app (server components), components, lib, services | App/Pages router, server actions, state management | Yes |
+| NestJS | `package.json → @nestjs/core` | controllers, guards, interceptors, services | Modules, guards, repositories, entities, DTOs, interceptors, pipes | Yes |
+| Express | `package.json → express` | routes, middleware, services | Middleware files, router organization | Yes |
+| Angular | `package.json → @angular/core` | components, pipes, directives, services | — | Yes |
+| Node.js | `package.json` (fallback) | routes, controllers, services | — | Yes |
+| Django | `requirements.txt → django` | views, templates, urls, services | — | Coming soon |
+| Flask | `requirements.txt → flask` | routes, blueprints, services | — | Coming soon |
+| FastAPI | `requirements.txt → fastapi` | routers, endpoints, services | — | Coming soon |
+| Go | `go.mod` | handlers, cmd, internal, services | — | Coming soon |
 
-Convention detection scans your source files for framework-specific patterns (decorators, file naming conventions, state management libraries, routing patterns) and surfaces them in CODING_GUIDELINES.md so AI agents follow your project's actual conventions — not just generic best practices.
+Each layer gets a framework-appropriate description in the business logic table (e.g., NestJS guards → "Authorization, access control, role checks", Next.js app → "Page routing, layouts, data fetching via server components"). Convention detection scans your source files for framework-specific patterns and surfaces them in CODING_GUIDELINES.md.
 
 ---
 

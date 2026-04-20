@@ -13,13 +13,14 @@ const FILE_MAP: Array<{
   templateName: string;
   outputPath: string;
   displayName: string;
+  mergeWithExisting: boolean;
 }> = [
-  { configKey: 'codingGuidelines', templateName: 'CODING_GUIDELINES.md.hbs', outputPath: 'CODING_GUIDELINES.md', displayName: 'CODING_GUIDELINES.md' },
-  { configKey: 'claudeMd', templateName: 'CLAUDE.md.hbs', outputPath: 'CLAUDE.md', displayName: 'CLAUDE.md' },
-  { configKey: 'cursorrules', templateName: 'cursorrules.hbs', outputPath: '.cursorrules', displayName: '.cursorrules' },
-  { configKey: 'windsurfrules', templateName: 'windsurfrules.hbs', outputPath: '.windsurfrules', displayName: '.windsurfrules' },
-  { configKey: 'agentsMd', templateName: 'AGENTS.md.hbs', outputPath: 'AGENTS.md', displayName: 'AGENTS.md' },
-  { configKey: 'cursorignore', templateName: 'cursorignore.hbs', outputPath: '.cursorignore', displayName: '.cursorignore' },
+  { configKey: 'codingGuidelines', templateName: 'CODING_GUIDELINES.md.hbs', outputPath: 'CODING_GUIDELINES.md', displayName: 'CODING_GUIDELINES.md', mergeWithExisting: false },
+  { configKey: 'claudeMd', templateName: 'CLAUDE.md.hbs', outputPath: 'CLAUDE.md', displayName: 'CLAUDE.md', mergeWithExisting: true },
+  { configKey: 'cursorrules', templateName: 'cursorrules.hbs', outputPath: '.cursorrules', displayName: '.cursorrules', mergeWithExisting: true },
+  { configKey: 'windsurfrules', templateName: 'windsurfrules.hbs', outputPath: '.windsurfrules', displayName: '.windsurfrules', mergeWithExisting: true },
+  { configKey: 'agentsMd', templateName: 'AGENTS.md.hbs', outputPath: 'AGENTS.md', displayName: 'AGENTS.md', mergeWithExisting: true },
+  { configKey: 'cursorignore', templateName: 'cursorignore.hbs', outputPath: '.cursorignore', displayName: '.cursorignore', mergeWithExisting: false },
 ];
 
 export { FILE_MAP };
@@ -41,6 +42,7 @@ export async function generateAll(
       fileName: entry.displayName,
       relativePath: entry.outputPath,
       content,
+      mergeWithExisting: entry.mergeWithExisting,
     });
   }
 

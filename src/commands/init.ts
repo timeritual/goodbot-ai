@@ -174,7 +174,7 @@ export const initCommand = new Command('init')
         type: 'input',
         name: 'mainBranch',
         message: 'Main branch name:',
-        default: 'main',
+        default: scan.defaultBranch,
       },
     ]);
 

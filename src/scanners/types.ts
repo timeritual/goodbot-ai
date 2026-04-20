@@ -69,4 +69,5 @@ export interface ScanResult {
   structure: StructureAnalysis;
   verification: VerificationCommands;
   frameworkPatterns: FrameworkPatterns;
+  defaultBranch: string;
 }

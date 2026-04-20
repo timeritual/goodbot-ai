@@ -80,7 +80,7 @@ export const frameworkDefaults: Record<Framework, FrameworkDefaults> = {
       'Missing DTOs for request validation — use class-validator DTOs',
       'Injecting services across module boundaries without exporting — use module exports',
     ],
-    businessLogicIn: ['services', 'providers'],
+    businessLogicIn: ['services'],
     businessLogicForbidden: ['controllers', 'guards', 'interceptors'],
     ignorePaths: [...BASE_IGNORE, '.env', '.env.*'],
   },

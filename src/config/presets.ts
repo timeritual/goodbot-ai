@@ -56,7 +56,7 @@ export function buildPresetConfig(
       existingFileStrategy: 'merge',
     },
     conventions: {
-      mainBranch: 'main',
+      mainBranch: scan.defaultBranch,
       importStyle: 'direct',
       customRules: [],
     },

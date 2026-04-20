@@ -133,34 +133,36 @@ Saves everything to `.goodbot/config.json` — your single source of truth. Also
 
 ### `goodbot generate`
 
-Reads your config and generates all enabled agent files:
+Reads your config, scans for framework conventions, and generates all enabled agent files:
 
 ```
 $ goodbot generate
 
+✔ Scan complete
+ℹ First run detected — running analysis automatically.
+✔ Analysis complete — B+ (81/100), 38 commits (3% AI)
 ✔ Generated 6 files
 ✓ CODING_GUIDELINES.md
-✓ CLAUDE.md
+✓ CLAUDE.md — prepending goodbot section (your content preserved below)
 ✓ .cursorrules
 ✓ .windsurfrules
 ✓ AGENTS.md
 ✓ .cursorignore
-```
-
-On first run, goodbot automatically analyzes your codebase and generates **adaptive guardrails** — rules that reflect your actual codebase state, not just generic best practices. Use `--analyze` on subsequent runs to refresh:
-
-```
-$ goodbot generate --analyze
-
-✔ Analysis complete — B+ (81/100), 38 commits (3% AI)
-✔ Generated 6 files
-✓ CODING_GUIDELINES.md
-✓ CLAUDE.md
-...
 Snapshot saved for freshness tracking.
 ```
 
-With `--analyze`, guardrails include your current health grade, specific violation counts, hotspot files, and known issues — so AI agents know exactly what to watch out for. A snapshot is also saved for [freshness tracking](#goodbot-freshness).
+On **first run**, goodbot automatically analyzes your codebase and generates **adaptive guardrails** — rules that reflect your actual codebase state, not just generic best practices. On subsequent runs, analysis is skipped (the CLI tells you why) — use `--analyze` to refresh:
+
+```
+$ goodbot generate
+
+✔ Scan complete
+  Skipping analysis (snapshot exists). Use --analyze to refresh.
+✔ Generated 6 files
+...
+```
+
+If existing agent files are found (e.g., an existing CLAUDE.md), goodbot **prepends its content at the top** wrapped in `<!-- goodbot:start/end -->` markers, preserving your content below. On re-generation, only the marker section is replaced. This behavior is controlled by the `existingFileStrategy` in config (set during `goodbot init`) — options are `merge` (default), `overwrite`, or `skip`.
 
 | Flag | Description |
 |------|-------------|
@@ -190,7 +192,7 @@ If you generated with `--analyze`, the snapshot age is also checked. Snapshots o
 
 ### `goodbot scan`
 
-Lightweight reconnaissance — detects your framework, languages, project structure, architectural layers, and verification commands. No files created, no config needed. Use this to see what goodbot sees before committing to anything.
+Lightweight reconnaissance — detects your framework, languages, project structure, architectural layers, verification commands (from `package.json` scripts), and framework-specific conventions. No files created, no config needed. Use this to see what goodbot sees before committing to anything.
 
 ```bash
 goodbot scan                        # Quick project overview
@@ -660,8 +662,8 @@ All config lives in `.goodbot/config.json`. Here's what it controls:
     ]
   },
   "verification": {
-    "typecheck": "npx tsc --noEmit",
-    "lint": "npx eslint src/",
+    "typecheck": "npm run typecheck",  // detected from package.json scripts
+    "lint": "npm run lint",
     "test": "npm test"
   },
   "agentFiles": {
@@ -698,21 +700,23 @@ Edit this file directly or re-run `goodbot init` to regenerate it.
 
 **Deep analysis** (import graphs, SOLID checks, dependency cycles, complexity, duplication, dead exports, health grading) is currently **TypeScript/JavaScript only**. Support for Python and Go is planned.
 
-**Framework detection and guardrail generation** work for all frameworks below — goodbot detects your stack and generates framework-specific red flags and guidelines. Projects in any language get guardrail files; TS/JS projects additionally get adaptive guardrails powered by live analysis.
+**Framework detection and guardrail generation** work for all frameworks below — goodbot detects your stack and generates framework-specific red flags, guidelines, and auto-detected conventions. Projects in any language get guardrail files; TS/JS projects additionally get adaptive guardrails powered by live analysis.
 
-| Framework | Detection | Red flags included | Deep analysis |
-|-----------|-----------|-------------------|:---:|
-| Angular | `package.json → @angular/core` | Logic in components, direct HTTP in components, missing DI | Yes |
-| React | `package.json → react` | Business logic in components, fetch in useEffect | Yes |
-| React Native | `package.json → react-native` | AsyncStorage misuse, fetch in screens | Yes |
-| Next.js | `package.json → next` | Secrets in client code, missing caching | Yes |
-| Express | `package.json → express` | Logic in route handlers, missing validation | Yes |
-| NestJS | `package.json → @nestjs/core` | Logic in controllers, missing DTOs | Yes |
-| Node.js | `package.json` (fallback) | Logic in route handlers | Yes |
-| Django | `requirements.txt → django` | Logic in views, querysets in templates | Coming soon |
-| Flask | `requirements.txt → flask` | Logic in routes, missing validation | Coming soon |
-| FastAPI | `requirements.txt → fastapi` | Logic in endpoints, missing Pydantic models | Coming soon |
-| Go | `go.mod` | Logic in handlers, missing error wrapping | Coming soon |
+| Framework | Detection | Red flags | Convention detection | Deep analysis |
+|-----------|-----------|-----------|---------------------|:---:|
+| React | `package.json → react` | Business logic in components, fetch in useEffect | State management (Redux/Zustand/Context), custom hooks | Yes |
+| React Native | `package.json → react-native` | AsyncStorage misuse, fetch in screens | State management, custom hooks | Yes |
+| Next.js | `package.json → next` | Secrets in client code, missing caching | App/Pages router, server actions, state management | Yes |
+| NestJS | `package.json → @nestjs/core` | Logic in controllers, missing DTOs | Modules, guards, repositories, entities, DTOs, interceptors, pipes | Yes |
+| Express | `package.json → express` | Logic in route handlers, missing validation | Middleware files, router organization | Yes |
+| Angular | `package.json → @angular/core` | Logic in components, direct HTTP in components, missing DI | — | Yes |
+| Node.js | `package.json` (fallback) | Logic in route handlers | — | Yes |
+| Django | `requirements.txt → django` | Logic in views, querysets in templates | — | Coming soon |
+| Flask | `requirements.txt → flask` | Logic in routes, missing validation | — | Coming soon |
+| FastAPI | `requirements.txt → fastapi` | Logic in endpoints, missing Pydantic models | — | Coming soon |
+| Go | `go.mod` | Logic in handlers, missing error wrapping | — | Coming soon |
+
+Convention detection scans your source files for framework-specific patterns (decorators, file naming conventions, state management libraries, routing patterns) and surfaces them in CODING_GUIDELINES.md so AI agents follow your project's actual conventions — not just generic best practices.
 
 ---
 

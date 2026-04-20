@@ -58,7 +58,9 @@ export const generateCommand = new Command('generate')
       const existingSnapshot = await loadSnapshot(projectRoot);
       if (!existingSnapshot) {
         shouldAnalyze = true;
-        log.info('First run detected — analyzing codebase for adaptive guardrails.');
+        log.info('First run detected — running analysis automatically.');
+      } else {
+        log.dim('Skipping analysis (snapshot exists). Use --analyze to refresh.');
       }
     }
 
@@ -136,7 +138,7 @@ export const generateCommand = new Command('generate')
             continue;
           }
           if (shouldMerge) {
-            log.info(`${file.fileName} — merging with existing file`);
+            log.info(`${file.fileName} — prepending goodbot section (your content preserved below)`);
           } else {
             log.warn(`${file.fileName} — overwriting (use --dry-run to preview)`);
           }

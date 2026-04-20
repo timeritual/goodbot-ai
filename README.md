@@ -11,7 +11,7 @@
 <p align="center">
   <strong>Train your AI to be a good bot.</strong><br/>
   Auto-generate guardrail files that keep AI coding agents aligned with your project's conventions.<br/>
-  SOLID principles analysis. Health grades. Continuous monitoring.
+  Design principles. Health grades. Continuous monitoring.
 </p>
 
 <p align="center">
@@ -25,7 +25,7 @@
 AI coding agents (Claude, Cursor, Copilot, Windsurf, Codex) are powerful — but they don't know your project's rules. Without guardrails, they will:
 
 - **Break your architecture** — import from internal files instead of barrels, mix business logic into UI components, bypass your layer boundaries
-- **Violate SOLID principles** — create god files, depend on concretions instead of abstractions, build fat interfaces
+- **Violate design principles** — create god files, add speculative abstractions, wrap everything in unnecessary helpers
 - **Ignore your conventions** — wrong naming, wrong patterns, wrong file locations
 - **Introduce regressions** — skip your verification checklist, miss type checks, forget to run tests
 - **Drift across agents** — your Claude instructions say one thing, your Cursor rules say another, and your Codex config says nothing at all
@@ -531,9 +531,13 @@ The grade is a weighted composite of four dimensions:
 
 ---
 
-## SOLID Principles
+## Design Principles
 
-goodbot checks three statically-analyzable SOLID principles and **generates guidelines for all five** in your CODING_GUIDELINES.md so AI agents follow them when writing code.
+goodbot generates two sets of design principles in CODING_GUIDELINES.md — **SOLID** for structural correctness and **design principles** (inspired by *A Philosophy of Software Design*) that counteract common AI agent failure modes.
+
+### SOLID Principles
+
+Three principles are statically analyzed; all five are generated as guidelines:
 
 | Principle | Checked | What it detects |
 |-----------|---------|-----------------|
@@ -542,6 +546,16 @@ goodbot checks three statically-analyzable SOLID principles and **generates guid
 | **L** — Liskov Substitution | Guidelines only | Generated guidelines teach contract honoring |
 | **I** — Interface Segregation | Yes | Barrel files exporting 15+ symbols (fat interfaces) |
 | **D** — Dependency Inversion | Yes | Importing concrete files when interfaces.ts exists in the target module |
+
+### AI-Focused Design Principles
+
+These rules target the specific ways AI-generated code degrades a codebase over time:
+
+| Principle | What it prevents |
+|-----------|-----------------|
+| **Deep modules, not shallow ones** | AI creating wrappers and helpers that just move complexity around |
+| **Don't add complexity "just in case"** | Speculative feature flags, unnecessary error handling, premature abstractions |
+| **Complexity is incremental** | Death by a thousand "harmless" additions — prefer removing code over adding it |
 
 ---
 
@@ -585,7 +599,7 @@ Includes a stability metrics table and lists any circular dependencies or layer 
 
 | File | Who reads it | Purpose |
 |------|-------------|---------|
-| `CODING_GUIDELINES.md` | All agents + humans | Architecture, import rules, SOLID principles, business logic placement, verification checklist |
+| `CODING_GUIDELINES.md` | All agents + humans | Architecture, import rules, SOLID + design principles, business logic placement, verification checklist |
 | `CLAUDE.md` | Claude Code, Claude in IDEs | Points to CODING_GUIDELINES.md + quick reference |
 | `.cursorrules` | Cursor AI | Points to CODING_GUIDELINES.md |
 | `.windsurfrules` | Windsurf AI | Points to CODING_GUIDELINES.md |
@@ -602,7 +616,7 @@ goodbot also generates internal tracking files in `.goodbot/`:
 | `.goodbot/snapshot.json` | Analysis snapshot (for freshness tracking via `freshness`) |
 | `.goodbot/history.json` | Health score history (for trend tracking via `trend`) |
 
-The key insight: **CODING_GUIDELINES.md is the single source of truth**. All agent-specific files simply point to it. This eliminates drift between agents and keeps maintenance to one file. The generated guidelines include SOLID principles tailored to your framework.
+The key insight: **CODING_GUIDELINES.md is the single source of truth**. All agent-specific files simply point to it. This eliminates drift between agents and keeps maintenance to one file. The generated guidelines include SOLID principles tailored to your framework and design principles that counteract common AI agent failure modes.
 
 ---
 

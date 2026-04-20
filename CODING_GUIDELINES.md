@@ -100,93 +100,29 @@ Depend on **abstractions**, not concretions.
 - High-level modules (screens, hooks) should not know about low-level implementation details.
 - If a module provides `interfaces.ts`, depend on those abstractions.
 
-## Known Issues in This Codebase
+## Design Principles
 
-> These rules are generated from a live analysis of this project (grade: **A**, score: 85/100). Pay special attention to these areas.
+These principles guard against the most common ways AI-generated code degrades a codebase.
 
-### Dead Exports — Do Not Create Unused Code
+### Deep Modules, Not Shallow Ones
+A module's value is the complexity it hides behind a simple interface. Before creating a new file, function, or class, ask: does this **absorb complexity** from its callers, or just **move it around**?
+- A helper that wraps one function call with no added logic is shallow — inline it.
+- A utility module with 15 tiny exports is a symptom, not a solution. Fewer exports that each do meaningful work are better.
+- If the interface (parameters, return types, setup) is nearly as complex as the implementation, the abstraction isn't earning its keep.
 
-This project has unused exports that nothing imports. Before creating a new export:
-1. **Search** for an existing function that does what you need
-2. If you find one, import and use it instead of writing a new one
-3. If no existing function fits, create the new export and ensure at least one consumer imports it
+### Don't Add Complexity "Just in Case"
+Every conditional, parameter, configuration option, and error handler has a maintenance cost. Only add complexity that solves a problem **that exists today**.
+- Don't add feature flags, options, or generics for hypothetical future requirements.
+- Don't handle error cases that the current code path makes impossible.
+- Don't create abstractions for a pattern you've only seen once — wait for the second or third instance.
+- Three similar lines of code are better than a premature abstraction.
 
-- **config** has unused exports: `type`, `type`, `type`
-- **analyzers** has unused exports: `type`, `type`, `type`, `type`, `type`, `runDependencyAnalysis`
+### Complexity Is Incremental
+No single change makes a codebase unmaintainable — it happens one "harmless" addition at a time. Before adding code, consider whether you are making the overall system simpler or more complex.
+- Prefer removing code over adding code when fixing bugs.
+- When extending a feature, check if existing machinery can handle the new case before adding new machinery.
+- If a change requires touching many files, the design may need to change — not just the code.
 
-### Code Duplication — Reuse Existing Logic
-
-Duplicated code blocks have been detected across files. Before writing new logic:
-1. **Search the codebase** for similar functions before implementing from scratch
-2. Extract shared patterns into a common utility rather than copying code
-3. If two files contain similar logic, refactor into a shared helper
-
-
-
-
-### High Complexity — Keep Functions Simple
-
-These files have high cyclomatic complexity and need careful attention:
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/complexity-checker.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/custom-rules.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/cycles.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/dead-export-checker.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/duplication-checker.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/git-history.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/health-score.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/import-parser.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/module-resolver.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/passthrough-checker.ts`
-
-When modifying these files, look for opportunities to extract helper functions. New code should keep branching logic (if/else/for/while/ternary) minimal.
-
-### Shallow Modules — Add Depth, Not Width
-
-These modules have wide interfaces relative to their implementation:
-- `utils`
-
-When adding to these modules, focus on adding implementation depth (more logic behind existing exports) rather than adding new exports.
-
-
-### Hotspot Files — High Churn Risk
-
-These files change frequently and are complex. Extra care is needed when modifying them — they are the most likely source of regressions:
-- `src/commands/analyze.ts`
-- `src/analyzers/index.ts`
-- `src/index.ts`
-- `src/analyzers/solid.ts`
-- `src/commands/generate.ts`
-- `src/commands/init.ts`
-- `src/commands/diff.ts`
-- `src/commands/ci.ts`
-- `src/generators/context-builder.ts`
-- `src/commands/fix.ts`
-
-Before modifying a hotspot file, understand its full scope and run all tests.
-
-### Temporal Coupling — Hidden Dependencies
-
-These file pairs always change together but are in different modules. This often means they share logic that should be extracted:
-- `src/analyzers/index.ts` ↔ `src/commands/analyze.ts` (coupling: 0.57)
-
-If you modify one file in a coupled pair, check whether the other needs a matching change.
-
-
-### Oversized Files
-
-These files exceed the size threshold and should not grow further:
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/passthrough-checker.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/commands/analyze.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/commands/fix.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/commands/init.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/complexity-checker.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/custom-rules.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/cycles.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/health-score.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/import-parser.ts`
-- `/Users/alanboyce/Documents/projects/goodbot-ai/src/analyzers/module-resolver.ts`
-
-When modifying these files, look for opportunities to extract functionality into separate files rather than adding more code.
 
 ## Code Style
 

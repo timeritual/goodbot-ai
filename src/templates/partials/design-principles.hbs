@@ -1,0 +1,22 @@
+## Design Principles
+
+These principles guard against the most common ways AI-generated code degrades a codebase.
+
+### Deep Modules, Not Shallow Ones
+A module's value is the complexity it hides behind a simple interface. Before creating a new file, function, or class, ask: does this **absorb complexity** from its callers, or just **move it around**?
+- A helper that wraps one function call with no added logic is shallow — inline it.
+- A utility module with 15 tiny exports is a symptom, not a solution. Fewer exports that each do meaningful work are better.
+- If the interface (parameters, return types, setup) is nearly as complex as the implementation, the abstraction isn't earning its keep.
+
+### Don't Add Complexity "Just in Case"
+Every conditional, parameter, configuration option, and error handler has a maintenance cost. Only add complexity that solves a problem **that exists today**.
+- Don't add feature flags, options, or generics for hypothetical future requirements.
+- Don't handle error cases that the current code path makes impossible.
+- Don't create abstractions for a pattern you've only seen once — wait for the second or third instance.
+- Three similar lines of code are better than a premature abstraction.
+
+### Complexity Is Incremental
+No single change makes a codebase unmaintainable — it happens one "harmless" addition at a time. Before adding code, consider whether you are making the overall system simpler or more complex.
+- Prefer removing code over adding code when fixing bugs.
+- When extending a feature, check if existing machinery can handle the new case before adding new machinery.
+- If a change requires touching many files, the design may need to change — not just the code.

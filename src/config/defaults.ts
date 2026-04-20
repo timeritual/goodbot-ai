@@ -75,12 +75,13 @@ export const frameworkDefaults: Record<Framework, FrameworkDefaults> = {
   },
   nest: {
     redFlags: [
-      'Business logic in controllers',
-      'Direct repository access in controllers',
-      'Missing DTOs for request validation',
+      'Business logic in controllers — controllers should only handle HTTP and delegate to services',
+      'Direct repository/ORM access in controllers — always go through services',
+      'Missing DTOs for request validation — use class-validator DTOs',
+      'Injecting services across module boundaries without exporting — use module exports',
     ],
-    businessLogicIn: ['services'],
-    businessLogicForbidden: ['controllers', 'modules'],
+    businessLogicIn: ['services', 'providers'],
+    businessLogicForbidden: ['controllers', 'guards', 'interceptors'],
     ignorePaths: [...BASE_IGNORE, '.env', '.env.*'],
   },
   python: {

@@ -28,10 +28,13 @@ export const initCommand = new Command('init')
   .option('--force', 'Overwrite existing config', false)
   .option('--preset <preset>', 'Use a preset: strict, recommended, or relaxed')
   .option('--dry-run', 'Preview what the preset would configure without saving', false)
+  .option('--on-conflict <strategy>', 'How to handle existing agent files: merge, overwrite, or skip (default: merge)')
   .action(async (opts) => {
     const projectRoot = opts.path;
+    const isPreset = !!opts.preset;
 
-    if (!opts.force && (await configExists(projectRoot))) {
+    // Preset mode: skip all interactive prompts (safe for CI / non-TTY)
+    if (!isPreset && !opts.force && (await configExists(projectRoot))) {
       const { overwrite } = await inquirer.prompt([
         {
           type: 'confirm',
@@ -51,36 +54,45 @@ export const initCommand = new Command('init')
     const scan = await runFullScan(projectRoot);
     spinner.succeed('Scan complete');
 
-    // Check for existing agent files
-    const agentFileNames = ['CLAUDE.md', '.cursorrules', '.windsurfrules', 'AGENTS.md', 'CODING_GUIDELINES.md'];
-    const existingFiles: string[] = [];
-    for (const f of agentFileNames) {
-      if (await fileExists(path.join(projectRoot, f))) {
-        existingFiles.push(f);
+    // Determine existing file strategy
+    let existingFileStrategy: 'merge' | 'overwrite' | 'skip' = 'merge';
+    if (opts.onConflict) {
+      if (!['merge', 'overwrite', 'skip'].includes(opts.onConflict)) {
+        log.error(`Unknown --on-conflict value "${opts.onConflict}". Use: merge, overwrite, or skip.`);
+        process.exit(1);
+      }
+      existingFileStrategy = opts.onConflict as 'merge' | 'overwrite' | 'skip';
+    } else if (!isPreset) {
+      // Interactive: check for existing agent files
+      const agentFileNames = ['CLAUDE.md', '.cursorrules', '.windsurfrules', 'AGENTS.md', 'CODING_GUIDELINES.md'];
+      const existingFiles: string[] = [];
+      for (const f of agentFileNames) {
+        if (await fileExists(path.join(projectRoot, f))) {
+          existingFiles.push(f);
+        }
+      }
+
+      if (existingFiles.length > 0) {
+        log.warn(`Found existing agent files: ${existingFiles.join(', ')}`);
+        const { fileAction } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'fileAction',
+            message: 'How should `goodbot generate` handle these files?',
+            choices: [
+              { name: 'Merge — prepend goodbot section, keep your content', value: 'merge' },
+              { name: 'Overwrite — replace entirely with generated content', value: 'overwrite' },
+              { name: 'Skip — do not generate files that already exist', value: 'skip' },
+            ],
+            default: 'merge',
+          },
+        ]);
+        existingFileStrategy = fileAction;
       }
     }
 
-    let existingFileStrategy: 'merge' | 'overwrite' | 'skip' = 'merge';
-    if (existingFiles.length > 0) {
-      log.warn(`Found existing agent files: ${existingFiles.join(', ')}`);
-      const { fileAction } = await inquirer.prompt([
-        {
-          type: 'list',
-          name: 'fileAction',
-          message: 'How should `goodbot generate` handle these files?',
-          choices: [
-            { name: 'Merge — prepend goodbot section, keep your content', value: 'merge' },
-            { name: 'Overwrite — replace entirely with generated content', value: 'overwrite' },
-            { name: 'Skip — do not generate files that already exist', value: 'skip' },
-          ],
-          default: 'merge',
-        },
-      ]);
-      existingFileStrategy = fileAction;
-    }
-
-    // Fast path: preset mode
-    if (opts.preset) {
+    // Fast path: preset mode (no further interactive prompts)
+    if (isPreset) {
       const preset = opts.preset as PresetName;
       if (!['strict', 'recommended', 'relaxed'].includes(preset)) {
         log.error(`Unknown preset "${preset}". Use: strict, recommended, or relaxed.`);

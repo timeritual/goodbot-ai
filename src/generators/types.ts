@@ -22,6 +22,7 @@ export interface GeneratorContext {
     allowedIn: string[];
     forbiddenIn: string[];
     redFlags: string[];
+    layers: Array<{ name: string; should: string; shouldNot: string; role: 'allowed' | 'forbidden' }>;
   };
   verification: {
     commands: Array<{ name: string; command: string }>;
@@ -35,12 +36,11 @@ export interface GeneratorContext {
     paths: string[];
     sensitiveFiles: string[];
   };
+  // Framework-tailored SOLID examples
+  srpExample: string;
+  dipExample: string;
+  ocpExample: string;
   // Computed flags
-  isReact: boolean;
-  isReactNative: boolean;
-  isNext: boolean;
-  isNode: boolean;
-  isPython: boolean;
   isTypescript: boolean;
   hasBarrels: boolean;
   hasLayers: boolean;

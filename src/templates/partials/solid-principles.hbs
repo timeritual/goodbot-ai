@@ -5,32 +5,21 @@ Follow these principles in all code you write or modify.
 ### S — Single Responsibility
 Each file and module should have **one reason to change**.
 {{#if hasLayers}}
-{{#each businessLogic.allowedIn}}
-- **{{this}}**: Business logic, data transformation, API orchestration
-{{/each}}
-{{#each businessLogic.forbiddenIn}}
-{{#if ../isNode}}
-- **{{this}}**: Request handling and delegation only — no business logic
+{{#each businessLogic.layers}}
+{{#ifEquals role "allowed"}}
+- **{{name}}**: Business logic, data transformation, API orchestration
 {{else}}
-- **{{this}}**: UI rendering, user interaction — no business logic
-{{/if}}
+- **{{name}}**: {{should}} — no business logic
+{{/ifEquals}}
 {{/each}}
 {{/if}}
 - Keep files under 300 lines. If a file is growing large, split it by responsibility.
-{{#if isNode}}
-- A function that queries data should not also transform or serialize it for the response.
-{{else}}
-- A function that fetches data should not also format it for display.
-{{/if}}
+- {{srpExample}}
 
 ### O — Open/Closed
 Modules should be **open for extension, closed for modification**.
 - Prefer composition over inheritance.
-{{#if isNode}}
-- Use middleware, interceptors, strategy patterns, and configuration objects instead of modifying existing code.
-{{else}}
-- Use callback patterns, strategy functions, and configuration objects instead of modifying existing code.
-{{/if}}
+- {{ocpExample}}
 - When adding a new variant (e.g., a new order type), extend — don't add another `if` branch.
 
 ### L — Liskov Substitution
@@ -50,10 +39,4 @@ Depend on **abstractions**, not concretions.
 {{#if hasBarrels}}
 - Always import from barrel files (`../services`), never from internal files (`../services/orderService`).
 {{/if}}
-{{#if isNode}}
-- High-level modules (controllers, routes) should not know about low-level implementation details (database drivers, ORMs).
-- Use dependency injection — depend on interfaces or abstract providers, not concrete implementations.
-{{else}}
-- High-level modules (screens, pages) should not know about low-level implementation details.
-- If a module provides `interfaces.ts`, depend on those abstractions.
-{{/if}}
+- {{dipExample}}

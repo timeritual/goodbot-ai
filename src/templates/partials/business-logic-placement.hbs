@@ -9,18 +9,7 @@ Business logic **must NOT** live in: {{#each businessLogic.forbiddenIn}}{{this}}
 
 | Layer | Should Contain | Should NOT Contain |
 |-------|---------------|-------------------|
-{{#each businessLogic.allowedIn}}
-{{#if ../isNode}}
-| **{{this}}** | Business rules, data transformation, orchestration | HTTP/request handling, response formatting |
-{{else}}
-| **{{this}}** | API calls, validation, caching, business rules | UI rendering, navigation |
-{{/if}}
-{{/each}}
-{{#each businessLogic.forbiddenIn}}
-{{#if ../isNode}}
-| **{{this}}** | {{layerShould this}} | {{layerShouldNot this}} |
-{{else}}
-| **{{this}}** | UI rendering, state wiring, navigation | Direct API calls, data transformation |
-{{/if}}
+{{#each businessLogic.layers}}
+| **{{name}}** | {{should}} | {{shouldNot}} |
 {{/each}}
 {{/if}}

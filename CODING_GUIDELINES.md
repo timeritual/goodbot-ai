@@ -72,15 +72,15 @@ Follow these principles in all code you write or modify.
 ### S — Single Responsibility
 Each file and module should have **one reason to change**.
 - **services**: Business logic, data transformation, API orchestration
-- **routes**: Request handling and delegation only — no business logic
-- **controllers**: Request handling and delegation only — no business logic
+- **routes**: Request/response handling, delegation to services — no business logic
+- **controllers**: Request/response handling, delegation to services — no business logic
 - Keep files under 300 lines. If a file is growing large, split it by responsibility.
 - A function that queries data should not also transform or serialize it for the response.
 
 ### O — Open/Closed
 Modules should be **open for extension, closed for modification**.
 - Prefer composition over inheritance.
-- Use middleware, interceptors, strategy patterns, and configuration objects instead of modifying existing code.
+- Use middleware, strategy patterns, and configuration objects instead of modifying existing code.
 - When adding a new variant (e.g., a new order type), extend — don't add another `if` branch.
 
 ### L — Liskov Substitution
@@ -98,8 +98,7 @@ Keep interfaces **focused and minimal**.
 ### D — Dependency Inversion
 Depend on **abstractions**, not concretions.
 - Always import from barrel files (`../services`), never from internal files (`../services/orderService`).
-- High-level modules (controllers, routes) should not know about low-level implementation details (database drivers, ORMs).
-- Use dependency injection — depend on interfaces or abstract providers, not concrete implementations.
+- High-level modules (routes, controllers) should not know about low-level implementation details (database drivers, ORMs).
 
 ## Design Principles
 

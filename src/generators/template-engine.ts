@@ -34,21 +34,6 @@ async function ensureEngine(): Promise<void> {
 
   Handlebars.registerHelper('add', (a: number, b: number) => a + b);
 
-  const LAYER_DESCRIPTIONS: Record<string, { should: string; shouldNot: string }> = {
-    guards: { should: 'Authorization, access control, role checks', shouldNot: 'Business logic, database access' },
-    interceptors: { should: 'Cross-cutting concerns (logging, caching, response transforms)', shouldNot: 'Business logic, database access' },
-    pipes: { should: 'Input validation, data transformation', shouldNot: 'Business logic, database access' },
-    middleware: { should: 'Request preprocessing (auth, logging, CORS)', shouldNot: 'Business logic, database access' },
-  };
-
-  Handlebars.registerHelper('layerShould', (layer: string) => {
-    return LAYER_DESCRIPTIONS[layer]?.should ?? 'Request/response handling, delegation to services';
-  });
-
-  Handlebars.registerHelper('layerShouldNot', (layer: string) => {
-    return LAYER_DESCRIPTIONS[layer]?.shouldNot ?? 'Direct database access, business rules';
-  });
-
   // Register partials
   const partialsDir = path.join(getTemplatesDir(), 'partials');
   try {

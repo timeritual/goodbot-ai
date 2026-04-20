@@ -1,4 +1,5 @@
 import type { GoodbotConfig } from '../config/index.js';
+import { frameworkDefaults } from '../config/index.js';
 import type { DependencyAnalysisSummary, FullAnalysis, GitHistoryAnalysis, TemporalCoupling } from '../analyzers/index.js';
 import type { FrameworkPatterns } from '../scanners/index.js';
 import type { GeneratorContext, AnalysisInsights } from './types.js';
@@ -43,6 +44,23 @@ export function buildContext(
   if (verification.build) verificationCommands.push({ name: 'Build', command: verification.build });
 
   const fw = project.framework;
+  const defaults = frameworkDefaults[fw] ?? frameworkDefaults.other;
+  const layerDescs = defaults.layerDescriptions;
+
+  // Build annotated layer list for templates
+  const defaultDesc = { should: 'Delegation and coordination', shouldNot: 'Business logic, direct data access' };
+  const businessLogicLayers = [
+    ...businessLogic.allowedIn.map(name => ({
+      name,
+      ...(layerDescs[name] ?? { should: 'Business rules, data transformation', shouldNot: 'Request handling, UI rendering' }),
+      role: 'allowed' as const,
+    })),
+    ...businessLogic.forbiddenIn.map(name => ({
+      name,
+      ...(layerDescs[name] ?? defaultDesc),
+      role: 'forbidden' as const,
+    })),
+  ];
 
   return {
     project,
@@ -50,15 +68,13 @@ export function buildContext(
       ...architecture,
       layerDiagramAscii: buildLayerDiagram(architecture.layers),
     },
-    businessLogic,
+    businessLogic: { ...businessLogic, layers: businessLogicLayers },
     verification: { commands: verificationCommands },
     conventions,
     ignore,
-    isReact: fw === 'react',
-    isReactNative: fw === 'react-native',
-    isNext: fw === 'next',
-    isNode: fw === 'node' || fw === 'express' || fw === 'nest',
-    isPython: fw === 'python' || fw === 'django' || fw === 'flask' || fw === 'fastapi',
+    srpExample: defaults.srpExample,
+    dipExample: defaults.dipExample,
+    ocpExample: defaults.ocpExample,
     isTypescript: project.language === 'typescript',
     hasBarrels: architecture.barrelImportRule !== 'none',
     hasLayers: architecture.layers.length > 0,

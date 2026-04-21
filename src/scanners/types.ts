@@ -26,12 +26,20 @@ export interface LanguageDetection {
   secondary: Language[];
 }
 
+export interface DetectedLayerRole {
+  id: string;
+  displayName: string;
+  description: string;
+  isLeaf?: boolean;
+}
+
 export interface DetectedLayer {
   name: string;
   path: string;
   suggestedLevel: number;
   hasBarrel: boolean;
   hasInterfaces: boolean;
+  role?: DetectedLayerRole;
 }
 
 export interface StructureAnalysis {
@@ -70,4 +78,5 @@ export interface ScanResult {
   verification: VerificationCommands;
   frameworkPatterns: FrameworkPatterns;
   defaultBranch: string;
+  systemType: 'api' | 'ui' | 'mixed' | 'library';
 }

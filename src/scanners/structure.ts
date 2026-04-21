@@ -1,31 +1,8 @@
 import path from 'node:path';
 import { readdir } from 'node:fs/promises';
 import { fileExists } from '../utils/index.js';
+import { matchRole, genericFeatureRole, type SystemType } from './roles.js';
 import type { DetectedLayer, StructureAnalysis } from './types.js';
-
-// Known directory names and their typical layer levels
-const KNOWN_LAYERS: Record<string, number> = {
-  types: 0,
-  constants: 0,
-  config: 1,
-  utils: 1,
-  helpers: 1,
-  lib: 2,
-  api: 3,
-  services: 4,
-  stores: 5,
-  features: 5,
-  hooks: 6,
-  contexts: 6,
-  composables: 6,
-  components: 7,
-  views: 7,
-  pages: 8,
-  screens: 8,
-  navigation: 8,
-  routes: 8,
-  app: 8,
-};
 
 async function getDirectories(dirPath: string): Promise<string[]> {
   try {
@@ -36,7 +13,19 @@ async function getDirectories(dirPath: string): Promise<string[]> {
   }
 }
 
-export async function analyzeStructure(projectRoot: string): Promise<StructureAnalysis> {
+async function getFiles(dirPath: string): Promise<string[]> {
+  try {
+    const entries = await readdir(dirPath, { withFileTypes: true });
+    return entries.filter((e) => e.isFile()).map((e) => e.name);
+  } catch {
+    return [];
+  }
+}
+
+export async function analyzeStructure(
+  projectRoot: string,
+  systemType: SystemType = 'library',
+): Promise<StructureAnalysis> {
   // Determine src root
   let srcRoot: string | null = null;
   for (const candidate of ['src', 'app', 'lib']) {
@@ -76,14 +65,22 @@ export async function analyzeStructure(projectRoot: string): Promise<StructureAn
     if (hasBarrel) hasBarrelFiles = true;
     if (hasInterfaces) hasInterfaceFiles = true;
 
-    const suggestedLevel = KNOWN_LAYERS[dir] ?? 5;
+    // Match directory to a canonical role for this system type
+    const fileNames = await getFiles(dirFullPath);
+    const role = matchRole(dir, fileNames, systemType) ?? genericFeatureRole(systemType);
 
     detectedLayers.push({
       name: dir,
       path: `${srcRoot}/${dir}`,
-      suggestedLevel,
+      suggestedLevel: role.level,
       hasBarrel,
       hasInterfaces,
+      role: {
+        id: role.id,
+        displayName: role.displayName,
+        description: role.description,
+        isLeaf: role.isLeaf,
+      },
     });
   }
 

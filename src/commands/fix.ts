@@ -269,8 +269,8 @@ async function fixMissingBarrels(
     const layerDir = path.join(projectRoot, layer.path);
     const indexPath = path.join(layerDir, 'index.ts');
 
-    // Don't create barrels for leaf directories (screens, navigation)
-    if (layer.suggestedLevel >= 8) continue;
+    // Don't create barrels for leaf directories (screens, routes, controllers)
+    if (layer.role?.isLeaf) continue;
 
     // Collect exportable files
     const exports = await collectExportableFiles(layerDir);

@@ -11,16 +11,30 @@ function buildLayerDiagram(
 
   const maxNameLen = Math.max(...layers.map((l) => l.name.length));
   const maxPathLen = Math.max(...layers.map((l) => l.path.length));
+  const hasAnyRole = layers.some((l) => l.role);
+  const maxRoleLen = hasAnyRole
+    ? Math.max(...layers.map((l) => l.role?.displayName.length ?? 0))
+    : 0;
 
   const lines: string[] = [];
+  if (hasAnyRole) lines.push('  Least stable ↑');
+
   // Sort by level descending for the diagram (highest = top)
   const sorted = [...layers].sort((a, b) => b.level - a.level);
 
   for (const layer of sorted) {
     const barrel = layer.hasBarrel ? '(barrel)' : '';
+    const roleLabel = layer.role
+      ? `[${layer.role.displayName.padEnd(maxRoleLen)}]  `
+      : '';
     lines.push(
-      `  Layer ${layer.level}:  ${layer.name.padEnd(maxNameLen)}  ← ${layer.path.padEnd(maxPathLen)}  ${barrel}`,
+      `  ${roleLabel}L${layer.level}:  ${layer.name.padEnd(maxNameLen)}  ← ${layer.path.padEnd(maxPathLen)}  ${barrel}`,
     );
+  }
+
+  if (hasAnyRole) {
+    lines.push('  Most stable ↓');
+    lines.push('  Stable Dependency Rule: higher levels depend on lower, never the reverse.');
   }
 
   return lines.join('\n');
@@ -62,10 +76,20 @@ export function buildContext(
     })),
   ];
 
+  const systemTypeLabels: Record<string, string> = {
+    api: 'server-side API',
+    ui: 'UI / frontend',
+    mixed: 'full-stack (UI + server)',
+    library: 'library',
+  };
+  const systemType = architecture.systemType ?? 'library';
+
   return {
     project,
     architecture: {
       ...architecture,
+      systemType,
+      systemTypeLabel: systemTypeLabels[systemType] ?? 'library',
       layerDiagramAscii: buildLayerDiagram(architecture.layers),
     },
     businessLogic: { ...businessLogic, layers: businessLogicLayers },

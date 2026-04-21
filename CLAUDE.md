@@ -9,8 +9,8 @@ All architectural rules, import conventions, verification checklists, and code s
 - Framework: node
 - Language: typescript
 - Main branch: `main`
-- Type check: `tsc --noEmit`
-- Lint: `eslint src/`
+- Type check: `npm run typecheck`
+- Lint: `npm run lint`
 - Test: `npm test`
 - Build: `npm run build`
 

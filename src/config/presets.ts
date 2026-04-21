@@ -29,10 +29,12 @@ export function buildPresetConfig(
         path: l.path,
         level: l.suggestedLevel,
         hasBarrel: l.hasBarrel,
+        role: l.role,
       })),
       dependencyDirection: 'downward',
       barrelImportRule: 'recommended',
       interfaceContracts: false,
+      systemType: scan.systemType,
     },
     businessLogic: {
       allowedIn: defaults.businessLogicIn,

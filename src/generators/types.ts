@@ -12,11 +12,14 @@ export interface GeneratorContext {
       level: number;
       hasBarrel: boolean;
       description?: string;
+      role?: { id: string; displayName: string; description: string; isLeaf?: boolean };
     }>;
     dependencyDirection: string;
     barrelImportRule: string;
     interfaceContracts: boolean;
     layerDiagramAscii: string;
+    systemType: 'api' | 'ui' | 'mixed' | 'library';
+    systemTypeLabel: string;
   };
   businessLogic: {
     allowedIn: string[];

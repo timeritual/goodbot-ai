@@ -1,11 +1,19 @@
 import { z } from 'zod';
 
+const LayerRoleSchema = z.object({
+  id: z.string(),
+  displayName: z.string(),
+  description: z.string(),
+  isLeaf: z.boolean().optional(),
+});
+
 const ArchitectureLayerSchema = z.object({
   name: z.string(),
   path: z.string(),
   level: z.number().int().min(0),
   hasBarrel: z.boolean().default(true),
   description: z.string().optional(),
+  role: LayerRoleSchema.optional(),
 });
 
 export const GoodbotConfigSchema = z.object({
@@ -24,6 +32,7 @@ export const GoodbotConfigSchema = z.object({
     dependencyDirection: z.enum(['downward', 'none']).default('downward'),
     barrelImportRule: z.enum(['always', 'recommended', 'none']).default('recommended'),
     interfaceContracts: z.boolean().default(false),
+    systemType: z.enum(['api', 'ui', 'mixed', 'library']).default('library'),
   }).default({}),
   businessLogic: z.object({
     allowedIn: z.array(z.string()).default([]),

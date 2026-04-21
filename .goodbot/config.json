@@ -11,54 +11,95 @@
         "name": "config",
         "path": "src/config",
         "level": 1,
-        "hasBarrel": true
+        "hasBarrel": true,
+        "role": {
+          "id": "config",
+          "displayName": "Config/Bootstrap",
+          "description": "Env, secrets, feature flags, bootstrap wiring"
+        }
       },
       {
         "name": "utils",
         "path": "src/utils",
         "level": 1,
-        "hasBarrel": true
+        "hasBarrel": true,
+        "role": {
+          "id": "utils",
+          "displayName": "Utilities",
+          "description": "Pure helpers with no framework or domain coupling"
+        }
       },
       {
         "name": "analyzers",
         "path": "src/analyzers",
-        "level": 5,
-        "hasBarrel": true
+        "level": 4,
+        "hasBarrel": true,
+        "role": {
+          "id": "feature",
+          "displayName": "Feature",
+          "description": "Domain-specific feature module"
+        }
       },
       {
         "name": "commands",
         "path": "src/commands",
-        "level": 5,
-        "hasBarrel": false
+        "level": 4,
+        "hasBarrel": false,
+        "role": {
+          "id": "feature",
+          "displayName": "Feature",
+          "description": "Domain-specific feature module"
+        }
       },
       {
         "name": "freshness",
         "path": "src/freshness",
-        "level": 5,
-        "hasBarrel": true
+        "level": 4,
+        "hasBarrel": true,
+        "role": {
+          "id": "feature",
+          "displayName": "Feature",
+          "description": "Domain-specific feature module"
+        }
       },
       {
         "name": "generators",
         "path": "src/generators",
-        "level": 5,
-        "hasBarrel": true
+        "level": 4,
+        "hasBarrel": true,
+        "role": {
+          "id": "feature",
+          "displayName": "Feature",
+          "description": "Domain-specific feature module"
+        }
       },
       {
         "name": "scanners",
         "path": "src/scanners",
-        "level": 5,
-        "hasBarrel": true
+        "level": 4,
+        "hasBarrel": true,
+        "role": {
+          "id": "feature",
+          "displayName": "Feature",
+          "description": "Domain-specific feature module"
+        }
       },
       {
         "name": "templates",
         "path": "src/templates",
-        "level": 5,
-        "hasBarrel": false
+        "level": 4,
+        "hasBarrel": false,
+        "role": {
+          "id": "feature",
+          "displayName": "Feature",
+          "description": "Domain-specific feature module"
+        }
       }
     ],
     "dependencyDirection": "downward",
     "barrelImportRule": "always",
-    "interfaceContracts": false
+    "interfaceContracts": false,
+    "systemType": "api"
   },
   "businessLogic": {
     "allowedIn": [
@@ -75,8 +116,8 @@
     ]
   },
   "verification": {
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint src/",
+    "typecheck": "npm run typecheck",
+    "lint": "npm run lint",
     "test": "npm test",
     "format": null,
     "build": "npm run build"
@@ -87,7 +128,8 @@
     "windsurfrules": true,
     "agentsMd": true,
     "cursorignore": true,
-    "codingGuidelines": true
+    "codingGuidelines": true,
+    "existingFileStrategy": "merge"
   },
   "conventions": {
     "mainBranch": "main",

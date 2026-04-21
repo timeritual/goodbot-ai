@@ -199,6 +199,7 @@ export const initCommand = new Command('init')
           path: l.path,
           level: l.suggestedLevel,
           hasBarrel: l.hasBarrel,
+          role: l.role,
         }));
 
         const { barrel } = await inquirer.prompt([
@@ -334,6 +335,7 @@ export const initCommand = new Command('init')
         dependencyDirection: 'downward',
         barrelImportRule,
         interfaceContracts,
+        systemType: scan.systemType,
       },
       businessLogic: {
         allowedIn: businessLogicAllowedIn,

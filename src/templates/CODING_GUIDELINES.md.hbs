@@ -4,10 +4,12 @@
 
 ## Architecture
 
-{{#if hasLayers}}
-### Module Layers (downward-only dependencies)
+This project is a **{{architecture.systemTypeLabel}}** ({{project.framework}}, {{project.language}}).
 
-Higher layers may import from lower layers, never the reverse.
+{{#if hasLayers}}
+### Module Layers (Stable Dependency Principle)
+
+Modules are ordered by **stability** — least stable at the top (depends on many things, changes often), most stable at the bottom (depended on by many things, rarely changes). Higher-level layers may import from lower-level layers; **never the reverse**.
 
 ```
 {{architecture.layerDiagramAscii}}

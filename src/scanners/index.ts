@@ -7,6 +7,7 @@ import { detectLanguage } from './language.js';
 import { analyzeStructure } from './structure.js';
 import { detectVerification } from './verification.js';
 import { detectFrameworkPatterns } from './patterns.js';
+import { detectSystemType } from './roles.js';
 import type { ScanResult } from './types.js';
 
 const execFileAsync = promisify(execFile);
@@ -18,11 +19,14 @@ export type {
   FrameworkDetection,
   LanguageDetection,
   DetectedLayer,
+  DetectedLayerRole,
   StructureAnalysis,
   VerificationCommands,
   FrameworkPatterns,
   FrameworkConvention,
 } from './types.js';
+export type { SystemType, LayerRole } from './roles.js';
+export { getRolesForSystemType, detectSystemType } from './roles.js';
 
 interface PackageJson {
   name?: string;
@@ -51,10 +55,13 @@ async function detectDefaultBranch(projectRoot: string): Promise<string> {
 }
 
 export async function runFullScan(projectRoot: string): Promise<ScanResult> {
-  const [framework, language, structure, verification, defaultBranch] = await Promise.all([
-    detectFramework(projectRoot),
+  // Framework detection runs first so we know the system type for structure analysis
+  const framework = await detectFramework(projectRoot);
+  const systemType = detectSystemType(framework.framework);
+
+  const [language, structure, verification, defaultBranch] = await Promise.all([
     detectLanguage(projectRoot),
-    analyzeStructure(projectRoot),
+    analyzeStructure(projectRoot, systemType),
     detectVerification(projectRoot),
     detectDefaultBranch(projectRoot),
   ]);
@@ -74,5 +81,6 @@ export async function runFullScan(projectRoot: string): Promise<ScanResult> {
     verification,
     frameworkPatterns,
     defaultBranch,
+    systemType,
   };
 }

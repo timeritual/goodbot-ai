@@ -4,19 +4,24 @@
 
 ## Architecture
 
-### Module Layers (downward-only dependencies)
+This project is a **server-side API** (node, typescript).
 
-Higher layers may import from lower layers, never the reverse.
+### Module Layers (Stable Dependency Principle)
+
+Modules are ordered by **stability** — least stable at the top (depends on many things, changes often), most stable at the bottom (depended on by many things, rarely changes). Higher-level layers may import from lower-level layers; **never the reverse**.
 
 ```
-  Layer 5:  analyzers   ← src/analyzers   (barrel)
-  Layer 5:  commands    ← src/commands    
-  Layer 5:  freshness   ← src/freshness   (barrel)
-  Layer 5:  generators  ← src/generators  (barrel)
-  Layer 5:  scanners    ← src/scanners    (barrel)
-  Layer 5:  templates   ← src/templates   
-  Layer 1:  config      ← src/config      (barrel)
-  Layer 1:  utils       ← src/utils       (barrel)
+  Least stable ↑
+  [Feature         ]  L4:  analyzers   ← src/analyzers   (barrel)
+  [Feature         ]  L4:  commands    ← src/commands    
+  [Feature         ]  L4:  freshness   ← src/freshness   (barrel)
+  [Feature         ]  L4:  generators  ← src/generators  (barrel)
+  [Feature         ]  L4:  scanners    ← src/scanners    (barrel)
+  [Feature         ]  L4:  templates   ← src/templates   
+  [Config/Bootstrap]  L1:  config      ← src/config      (barrel)
+  [Utilities       ]  L1:  utils       ← src/utils       (barrel)
+  Most stable ↓
+  Stable Dependency Rule: higher levels depend on lower, never the reverse.
 ```
 
 ### Import Rules
@@ -59,8 +64,8 @@ If you see any of these patterns in code you're writing, stop and reconsider:
 
 Before committing, always run:
 
-1. `tsc --noEmit` — Type check
-2. `eslint src/` — Lint
+1. `npm run typecheck` — Type check
+2. `npm run lint` — Lint
 3. `npm test` — Test
 4. `npm run build` — Build
 

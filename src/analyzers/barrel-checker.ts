@@ -13,9 +13,13 @@ export function findBarrelViolations(
 ): BarrelViolation[] {
   // Build a set of modules that have barrels
   const barrelModules = new Map<string, DetectedLayer>();
+  const roleByModule = new Map<string, string>();
   for (const layer of detectedLayers) {
     if (layer.hasBarrel) {
       barrelModules.set(layer.name, layer);
+    }
+    if (layer.role) {
+      roleByModule.set(layer.name, layer.role.displayName);
     }
   }
 
@@ -58,6 +62,8 @@ export function findBarrelViolations(
             specifier: imp.specifier,
             targetModule,
             suggestion: `import from '${suggestion}' instead`,
+            sourceRole: roleByModule.get(fi.moduleName),
+            targetRole: roleByModule.get(targetModule),
           });
         }
       }

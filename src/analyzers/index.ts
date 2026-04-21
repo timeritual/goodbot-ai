@@ -96,9 +96,9 @@ function buildDependencyAnalysis(
   const circularDependencies = findCircularDependencies(modules, edges);
 
   // Use config layers if available, otherwise use detected layers
-  const layers: Array<{ name: string; level: number }> = config?.architecture.layers.length
-    ? config.architecture.layers
-    : structure.detectedLayers.map((l) => ({ name: l.name, level: l.suggestedLevel }));
+  const layers: Array<{ name: string; level: number; role?: string }> = config?.architecture.layers.length
+    ? config.architecture.layers.map((l) => ({ name: l.name, level: l.level, role: l.role?.displayName }))
+    : structure.detectedLayers.map((l) => ({ name: l.name, level: l.suggestedLevel, role: l.role?.displayName }));
 
   const barrelViolations =
     (config?.architecture.barrelImportRule === 'always' || structure.hasBarrelFiles)
@@ -149,7 +149,9 @@ export function summarizeAnalysis(analysis: DependencyAnalysis): DependencyAnaly
     topViolations.push(`Circular: ${cd.cycle.join(' → ')}`);
   }
   for (const lv of analysis.layerViolations.slice(0, 2)) {
-    topViolations.push(`Layer: ${lv.fromModule} (L${lv.fromLevel}) → ${lv.toModule} (L${lv.toLevel})`);
+    const fromLabel = lv.fromRole ? `[${lv.fromRole}] ${lv.fromModule}` : `${lv.fromModule} (L${lv.fromLevel})`;
+    const toLabel = lv.toRole ? `[${lv.toRole}] ${lv.toModule}` : `${lv.toModule} (L${lv.toLevel})`;
+    topViolations.push(`Layer: ${fromLabel} → ${toLabel}`);
   }
   for (const sv of analysis.stabilityViolations.slice(0, 1)) {
     topViolations.push(`Stability: ${sv.from} (I=${sv.fromInstability}) → ${sv.to} (I=${sv.toInstability})`);

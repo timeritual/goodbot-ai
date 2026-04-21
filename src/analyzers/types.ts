@@ -66,6 +66,8 @@ export interface BarrelViolation {
   specifier: string;
   targetModule: string;
   suggestion: string;
+  sourceRole?: string;
+  targetRole?: string;
 }
 
 /** A layer ordering violation */
@@ -75,8 +77,10 @@ export interface LayerViolation {
   specifier: string;
   fromModule: string;
   fromLevel: number;
+  fromRole?: string;
   toModule: string;
   toLevel: number;
+  toRole?: string;
 }
 
 /** Complete analysis result */

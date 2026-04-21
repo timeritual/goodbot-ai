@@ -1,8 +1,9 @@
 import type { FileImports, LayerViolation } from './types.js';
 
-interface LayerInfo {
+export interface LayerInfo {
   name: string;
   level: number;
+  role?: string;
 }
 
 /**
@@ -14,8 +15,10 @@ export function findLayerViolations(
   layers: LayerInfo[],
 ): LayerViolation[] {
   const levelByModule = new Map<string, number>();
+  const roleByModule = new Map<string, string>();
   for (const layer of layers) {
     levelByModule.set(layer.name, layer.level);
+    if (layer.role) roleByModule.set(layer.name, layer.role);
   }
 
   const violations: LayerViolation[] = [];
@@ -39,8 +42,10 @@ export function findLayerViolations(
           specifier: imp.specifier,
           fromModule: fi.moduleName,
           fromLevel,
+          fromRole: roleByModule.get(fi.moduleName),
           toModule: targetModule,
           toLevel,
+          toRole: roleByModule.get(targetModule),
         });
       }
     }

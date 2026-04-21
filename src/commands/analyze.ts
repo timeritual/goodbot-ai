@@ -175,9 +175,20 @@ export function renderDependencyAnalysis(analysis: DependencyAnalysis): void {
   if (analysis.layerViolations.length > 0) {
     log.header(`Layer Violations (${analysis.layerViolations.length})`);
     console.log(chalk.dim('─'.repeat(50)));
+    log.dim('  Upward dependencies — violates the Stable Dependency Principle.');
+    console.log();
     for (const lv of analysis.layerViolations) {
-      console.log(`  ${chalk.red('✗')} ${lv.fromModule} (L${lv.fromLevel}) → ${lv.toModule} (L${lv.toLevel})`);
+      const fromLabel = lv.fromRole
+        ? `${chalk.cyan(`[${lv.fromRole}]`)} ${lv.fromModule} (L${lv.fromLevel})`
+        : `${lv.fromModule} (L${lv.fromLevel})`;
+      const toLabel = lv.toRole
+        ? `${chalk.cyan(`[${lv.toRole}]`)} ${lv.toModule} (L${lv.toLevel})`
+        : `${lv.toModule} (L${lv.toLevel})`;
+      console.log(`  ${chalk.red('✗')} ${fromLabel} imports from ${toLabel}`);
       console.log(chalk.dim(`    ${lv.file}:${lv.line} → ${lv.specifier}`));
+      if (lv.fromRole && lv.toRole) {
+        console.log(chalk.dim(`    ${lv.fromRole} must not depend on ${lv.toRole} — dependency direction is wrong.`));
+      }
     }
   }
 
@@ -186,7 +197,13 @@ export function renderDependencyAnalysis(analysis: DependencyAnalysis): void {
     log.header(`Barrel Import Violations (${analysis.barrelViolations.length})`);
     console.log(chalk.dim('─'.repeat(50)));
     for (const bv of analysis.barrelViolations.slice(0, 10)) {
-      console.log(`  ${chalk.red('✗')} ${bv.file}:${bv.line}`);
+      const sourceLabel = bv.sourceRole
+        ? `${chalk.cyan(`[${bv.sourceRole}]`)} ${bv.file}`
+        : bv.file;
+      const targetLabel = bv.targetRole
+        ? ` (from ${chalk.cyan(`[${bv.targetRole}]`)} ${bv.targetModule})`
+        : '';
+      console.log(`  ${chalk.red('✗')} ${sourceLabel}:${bv.line}${targetLabel}`);
       console.log(chalk.dim(`    import from '${bv.specifier}'`));
       console.log(chalk.green(`    → ${bv.suggestion}`));
     }

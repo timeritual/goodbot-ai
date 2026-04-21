@@ -251,7 +251,11 @@ Circular Dependencies (2)
 
 Layer Violations (1)
 ──────────────────────────────────────────────────
-  ✗ debug (L5) → contexts (L6)
+  Upward dependencies — violates the Stable Dependency Principle.
+
+  ✗ [Domain/Entities] domain (L0) imports from [Controllers/Transport] controllers (L7)
+    src/domain/user.entity.ts:1 → ../controllers/user.controller
+    Domain/Entities must not depend on Controllers/Transport — dependency direction is wrong.
 
 SOLID Analysis
 ──────────────────────────────────────────────────
@@ -541,6 +545,57 @@ The grade is a weighted composite of four dimensions:
 
 ---
 
+## System Types & Stability Ordering
+
+goodbot auto-detects what **kind of system** it's analyzing and applies a canonical layer ordering based on the Stable Dependency Principle. Higher-level layers depend on lower-level layers — never the reverse.
+
+### System types
+
+| System type | Frameworks | What it is |
+|-------------|-----------|-----------|
+| **api** | NestJS, Express, Node, FastAPI, Flask, Django, Go | Server-side API — controllers at top (least stable), domain at bottom (most stable) |
+| **ui** | React, React Native, Angular, Vue | Frontend UI — navigation/screens at top, types/utils at bottom |
+| **mixed** | Next.js, Nuxt | Full-stack — combines UI and API layering |
+| **library** | `other` | Reusable library — minimal stack (types, utils, core, public API) |
+
+### Canonical ordering per system type
+
+For server-side APIs (matches the classic server-side layering):
+
+```
+Least stable  →  Controllers/Transport    (HTTP routes, DTOs, GraphQL)
+                 Cross-cutting              (guards, pipes, interceptors)
+                 Modules/Composition        (DI wiring, exports)
+                 Services/Application logic (business rules, use cases)
+                 Infrastructure             (queues, cache, third-party APIs)
+                 Repositories/Data access
+                 Config/Bootstrap
+Most stable   →  Domain/Entities            (core models, value objects)
+```
+
+For UI apps: `types → config → utils → api-client → services → state → hooks → components → screens → navigation`.
+
+### Framework-specific roles
+
+Frameworks with distinctive conventions get their own role set that overrides the generic ordering:
+
+- **Angular** — Pipes, directives, HTTP interceptors, route guards, and NgModules as distinct layers
+- **Vue** — Composables, plugins, layouts, Vue Router
+- **Nuxt** — `server/` (API routes), middleware (navigation guards), composables, plugins
+- **NestJS** — Controllers, guards, interceptors, pipes, modules, repositories, entities (via `*.module.ts`, `*.controller.ts`, `*.repository.ts`, `*.entity.ts` file patterns)
+
+### Role matching
+
+goodbot matches each directory under `src/` to a canonical role using:
+
+1. **Directory name patterns** — `controllers/`, `services/`, `guards/`, `components/`, `stores/`, etc.
+2. **File name patterns** — `*.controller.ts`, `*.entity.ts`, `*.repository.ts`, `*.guard.ts`, etc.
+3. **Fallback** — unrecognized directories are assigned a generic `feature` role at mid-stack.
+
+The detected role is shown in layer violation output and in the generated `CODING_GUIDELINES.md` layer diagram.
+
+---
+
 ## Design Principles
 
 goodbot generates two sets of design principles in CODING_GUIDELINES.md — **SOLID** for structural correctness and **design principles** (inspired by *A Philosophy of Software Design*) that counteract common AI agent failure modes.
@@ -717,21 +772,23 @@ Edit this file directly or re-run `goodbot init` to regenerate it.
 
 **Framework detection and guardrail generation** work for all frameworks below. Each framework gets tailored SOLID examples, layer descriptions, red flags, and (where supported) auto-detected conventions. All of this is data-driven — templates are framework-agnostic and adding a new framework only requires a data entry.
 
-| Framework | Detection | Tailored layer descriptions | Convention detection | Deep analysis |
-|-----------|-----------|---------------------------|---------------------|:---:|
-| React | `package.json → react` | components, pages, hooks, services | State management (Redux/Zustand/Context), custom hooks | Yes |
-| React Native | `package.json → react-native` | screens, components, hooks, services | State management, custom hooks | Yes |
-| Next.js | `package.json → next` | app (server components), components, lib, services | App/Pages router, server actions, state management | Yes |
-| NestJS | `package.json → @nestjs/core` | controllers, guards, interceptors, services | Modules, guards, repositories, entities, DTOs, interceptors, pipes | Yes |
-| Express | `package.json → express` | routes, middleware, services | Middleware files, router organization | Yes |
-| Angular | `package.json → @angular/core` | components, pipes, directives, services | — | Yes |
-| Node.js | `package.json` (fallback) | routes, controllers, services | — | Yes |
-| Django | `requirements.txt → django` | views, templates, urls, services | — | Coming soon |
-| Flask | `requirements.txt → flask` | routes, blueprints, services | — | Coming soon |
-| FastAPI | `requirements.txt → fastapi` | routers, endpoints, services | — | Coming soon |
-| Go | `go.mod` | handlers, cmd, internal, services | — | Coming soon |
+| Framework | System type | Detection | Canonical layer roles | Convention detection | Deep analysis |
+|-----------|-------------|-----------|---------------------|---------------------|:---:|
+| React | UI | `package.json → react` | types, utils, api-client, services, state, hooks, components, screens, navigation | State management (Redux/Zustand/Context), custom hooks | Yes |
+| React Native | UI | `package.json → react-native` | same as React + screens | State management, custom hooks | Yes |
+| Angular | UI | `package.json → @angular/core` | types, services, state, pipes, directives, interceptors, guards (route), components, NgModules, pages | — | Yes |
+| Vue | UI | `package.json → vue` | types, api, services, stores (Pinia/Vuex), composables, directives, plugins, components, layouts, pages, router | — | Yes |
+| Next.js | Mixed | `package.json → next` | app (server components), components, lib, services | App/Pages router, server actions, state management | Yes |
+| Nuxt | Mixed | `package.json → nuxt` | types, server, services, state, composables, plugins, middleware, components, layouts, pages | — | Yes |
+| NestJS | API | `package.json → @nestjs/core` | domain, config, repositories, services, modules, cross-cutting (guards/interceptors/pipes), controllers | Modules, guards, repositories, entities, DTOs, interceptors, pipes | Yes |
+| Express | API | `package.json → express` | domain, config, services, middleware, routes | Middleware files, router organization | Yes |
+| Node.js | API | `package.json` (fallback) | domain, config, repositories, services, controllers | — | Yes |
+| Django | API | `requirements.txt → django` | models, views, templates, urls, services | — | Coming soon |
+| Flask | API | `requirements.txt → flask` | models, routes, blueprints, services | — | Coming soon |
+| FastAPI | API | `requirements.txt → fastapi` | models, routers, endpoints, services | — | Coming soon |
+| Go | API | `go.mod` | types, internal, services, handlers, cmd | — | Coming soon |
 
-Each layer gets a framework-appropriate description in the business logic table (e.g., NestJS guards → "Authorization, access control, role checks", Next.js app → "Page routing, layouts, data fetching via server components"). Convention detection scans your source files for framework-specific patterns and surfaces them in CODING_GUIDELINES.md.
+**System types** (`api` / `ui` / `mixed` / `library`) are auto-detected from the framework. Each type has a canonical stability ordering based on the Stable Dependency Principle — higher layers depend on lower layers, never the reverse. Frameworks with distinctive conventions (Angular's NgModules/pipes/directives, Vue's composables/layouts, Nuxt's server/middleware) get their own role sets that override the generic UI/API/Mixed ordering.
 
 ---
 

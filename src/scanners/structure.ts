@@ -2,7 +2,7 @@ import path from 'node:path';
 import { readdir } from 'node:fs/promises';
 import { fileExists } from '../utils/index.js';
 import { matchRole, genericFeatureRole, type SystemType } from './roles.js';
-import type { DetectedLayer, StructureAnalysis } from './types.js';
+import type { DetectedLayer, Framework, StructureAnalysis } from './types.js';
 
 async function getDirectories(dirPath: string): Promise<string[]> {
   try {
@@ -25,13 +25,34 @@ async function getFiles(dirPath: string): Promise<string[]> {
 export async function analyzeStructure(
   projectRoot: string,
   systemType: SystemType = 'library',
+  framework?: Framework,
 ): Promise<StructureAnalysis> {
-  // Determine src root
+  // Determine src root — conventional locations, with framework-specific overrides
   let srcRoot: string | null = null;
   for (const candidate of ['src', 'app', 'lib']) {
     if (await fileExists(path.join(projectRoot, candidate))) {
       srcRoot = candidate;
       break;
+    }
+  }
+
+  // Angular convention: everything lives under src/app/ with src/ containing only app/, main.ts, etc.
+  if (srcRoot === 'src' && framework === 'angular') {
+    const appPath = path.join(projectRoot, 'src', 'app');
+    if (await fileExists(appPath)) {
+      srcRoot = 'src/app';
+    }
+  }
+
+  // Nuxt convention: directories live at project root (components/, pages/, etc.), no src/ wrapper.
+  // If we found no src/ but this is Nuxt, use the project root.
+  if (!srcRoot && framework === 'nuxt') {
+    const nuxtMarkers = ['pages', 'components', 'composables', 'server'];
+    for (const marker of nuxtMarkers) {
+      if (await fileExists(path.join(projectRoot, marker))) {
+        srcRoot = '.';
+        break;
+      }
     }
   }
 
@@ -65,9 +86,9 @@ export async function analyzeStructure(
     if (hasBarrel) hasBarrelFiles = true;
     if (hasInterfaces) hasInterfaceFiles = true;
 
-    // Match directory to a canonical role for this system type
+    // Match directory to a canonical role for this system type (and framework, if it has specific roles)
     const fileNames = await getFiles(dirFullPath);
-    const role = matchRole(dir, fileNames, systemType) ?? genericFeatureRole(systemType);
+    const role = matchRole(dir, fileNames, systemType, framework) ?? genericFeatureRole(systemType);
 
     detectedLayers.push({
       name: dir,

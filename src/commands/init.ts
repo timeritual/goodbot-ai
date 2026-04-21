@@ -16,7 +16,8 @@ import type { Framework, Language } from '../scanners/index.js';
 import path from 'node:path';
 
 const FRAMEWORKS: Framework[] = [
-  'react', 'react-native', 'next', 'node', 'express', 'nest',
+  'react', 'react-native', 'next', 'angular', 'vue', 'nuxt',
+  'node', 'express', 'nest',
   'python', 'django', 'flask', 'fastapi', 'go', 'other',
 ];
 

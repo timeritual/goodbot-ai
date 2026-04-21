@@ -21,7 +21,7 @@ export const GoodbotConfigSchema = z.object({
   project: z.object({
     name: z.string(),
     framework: z.enum([
-      'react', 'react-native', 'next', 'angular', 'node', 'express', 'nest',
+      'react', 'react-native', 'next', 'angular', 'vue', 'nuxt', 'node', 'express', 'nest',
       'python', 'django', 'flask', 'fastapi', 'go', 'other',
     ]),
     language: z.enum(['typescript', 'javascript', 'python', 'go', 'other']),

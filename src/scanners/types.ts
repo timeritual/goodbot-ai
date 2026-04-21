@@ -3,6 +3,8 @@ export type Framework =
   | 'react-native'
   | 'next'
   | 'angular'
+  | 'vue'
+  | 'nuxt'
   | 'node'
   | 'express'
   | 'nest'

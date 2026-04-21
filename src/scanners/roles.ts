@@ -28,8 +28,10 @@ export function detectSystemType(framework: Framework): SystemType {
     case 'react':
     case 'react-native':
     case 'angular':
+    case 'vue':
       return 'ui';
     case 'next':
+    case 'nuxt':
       return 'mixed';
     case 'other':
     default:
@@ -229,6 +231,224 @@ const MIXED_ROLES: LayerRole[] = [
 ];
 
 /**
+ * Angular-specific ordering — Angular has its own cross-cutting concepts
+ * (pipes, directives, guards, interceptors) and NgModule composition.
+ */
+const ANGULAR_ROLES: LayerRole[] = [
+  {
+    id: 'types',
+    displayName: 'Types/Models',
+    description: 'Interfaces, models, enums, shared type definitions',
+    level: 0,
+    dirPatterns: ['types', 'typings', 'models', 'interfaces', 'enums', 'constants'],
+  },
+  {
+    id: 'config',
+    displayName: 'Config',
+    description: 'Environment, tokens, feature flags',
+    level: 1,
+    dirPatterns: ['config', 'configuration', 'environments', 'tokens'],
+  },
+  {
+    id: 'utils',
+    displayName: 'Utilities',
+    description: 'Pure helpers, validators, formatters',
+    level: 2,
+    dirPatterns: ['utils', 'helpers', 'lib', 'shared'],
+  },
+  {
+    id: 'services',
+    displayName: 'Services',
+    description: 'HTTP clients, business logic, data access (Injectable)',
+    level: 3,
+    dirPatterns: ['services', 'api', 'data', 'repositories'],
+    filePatterns: ['*.service.*'],
+  },
+  {
+    id: 'state',
+    displayName: 'State management',
+    description: 'NgRx stores, signals, effects, selectors',
+    level: 4,
+    dirPatterns: ['store', 'stores', 'state', 'ngrx', 'signals'],
+  },
+  {
+    id: 'pipes',
+    displayName: 'Pipes',
+    description: 'Template data transformation',
+    level: 5,
+    dirPatterns: ['pipes'],
+    filePatterns: ['*.pipe.*'],
+  },
+  {
+    id: 'directives',
+    displayName: 'Directives',
+    description: 'Reusable DOM behavior',
+    level: 5,
+    dirPatterns: ['directives'],
+    filePatterns: ['*.directive.*'],
+  },
+  {
+    id: 'interceptors',
+    displayName: 'HTTP Interceptors',
+    description: 'Cross-cutting HTTP concerns (auth headers, logging, retries)',
+    level: 6,
+    dirPatterns: ['interceptors'],
+    filePatterns: ['*.interceptor.*'],
+  },
+  {
+    id: 'guards',
+    displayName: 'Route Guards',
+    description: 'CanActivate, CanDeactivate, CanLoad — route access control',
+    level: 6,
+    dirPatterns: ['guards'],
+    filePatterns: ['*.guard.*'],
+  },
+  {
+    id: 'components',
+    displayName: 'Components',
+    description: 'Reusable UI building blocks',
+    level: 7,
+    dirPatterns: ['components', 'ui', 'widgets', 'elements'],
+  },
+  {
+    id: 'modules',
+    displayName: 'NgModules',
+    description: 'Feature composition, declarations, imports, providers',
+    level: 8,
+    dirPatterns: ['modules', 'features'],
+    filePatterns: ['*.module.*'],
+  },
+  {
+    id: 'pages',
+    displayName: 'Pages/Routes',
+    description: 'Route-level containers, app shell',
+    level: 9,
+    dirPatterns: ['pages', 'views', 'routes', 'app'],
+    isLeaf: true,
+  },
+];
+
+/**
+ * Vue-specific ordering — Vue uses composables, plugins, layouts, and pages.
+ */
+const VUE_ROLES: LayerRole[] = [
+  {
+    id: 'types',
+    displayName: 'Types/Constants',
+    description: 'Shared type definitions and constants',
+    level: 0,
+    dirPatterns: ['types', 'typings', 'constants', 'enums'],
+  },
+  {
+    id: 'config',
+    displayName: 'Config',
+    description: 'App configuration, environment, theme',
+    level: 1,
+    dirPatterns: ['config', 'configuration', 'theme'],
+  },
+  {
+    id: 'utils',
+    displayName: 'Utilities',
+    description: 'Pure helpers, formatters, validators',
+    level: 2,
+    dirPatterns: ['utils', 'helpers', 'lib'],
+  },
+  {
+    id: 'api-client',
+    displayName: 'API Clients',
+    description: 'HTTP clients, data fetching',
+    level: 3,
+    dirPatterns: ['api', 'clients', 'network', 'queries'],
+  },
+  {
+    id: 'services',
+    displayName: 'Services',
+    description: 'Business logic, data transformation',
+    level: 4,
+    dirPatterns: ['services', 'repositories', 'domain'],
+    filePatterns: ['*.service.*'],
+  },
+  {
+    id: 'state',
+    displayName: 'State management',
+    description: 'Pinia stores, Vuex stores, global state',
+    level: 5,
+    dirPatterns: ['stores', 'store', 'state', 'pinia', 'vuex'],
+  },
+  {
+    id: 'composables',
+    displayName: 'Composables',
+    description: 'Reusable reactive state and logic (use* functions)',
+    level: 6,
+    dirPatterns: ['composables', 'hooks'],
+  },
+  {
+    id: 'directives',
+    displayName: 'Directives',
+    description: 'Custom directives for DOM behavior',
+    level: 6,
+    dirPatterns: ['directives'],
+  },
+  {
+    id: 'plugins',
+    displayName: 'Plugins',
+    description: 'App-level plugins (i18n, analytics, HTTP clients)',
+    level: 6,
+    dirPatterns: ['plugins'],
+  },
+  {
+    id: 'components',
+    displayName: 'Components',
+    description: 'Reusable UI building blocks',
+    level: 7,
+    dirPatterns: ['components', 'ui', 'widgets'],
+  },
+  {
+    id: 'layouts',
+    displayName: 'Layouts',
+    description: 'Page layouts and shell components',
+    level: 8,
+    dirPatterns: ['layouts'],
+  },
+  {
+    id: 'pages',
+    displayName: 'Pages/Views',
+    description: 'Route-level views',
+    level: 9,
+    dirPatterns: ['pages', 'views', 'screens'],
+    isLeaf: true,
+  },
+  {
+    id: 'router',
+    displayName: 'Router',
+    description: 'Vue Router configuration',
+    level: 10,
+    dirPatterns: ['router', 'routes'],
+    isLeaf: true,
+  },
+];
+
+/**
+ * Nuxt (full-stack Vue meta-framework) — has server/ for API routes alongside
+ * Vue-style UI layers. Directories typically live at project root.
+ */
+const NUXT_ROLES: LayerRole[] = [
+  { id: 'types', displayName: 'Types/Constants', description: 'Shared type definitions and constants', level: 0, dirPatterns: ['types', 'typings', 'constants'] },
+  { id: 'config', displayName: 'Config', description: 'App config, runtime config', level: 1, dirPatterns: ['config'] },
+  { id: 'utils', displayName: 'Utilities', description: 'Pure helpers auto-imported by Nuxt', level: 2, dirPatterns: ['utils', 'helpers'] },
+  { id: 'server', displayName: 'Server', description: 'Server-only code — API routes, server middleware, server utils', level: 3, dirPatterns: ['server'] },
+  { id: 'services', displayName: 'Services', description: 'Shared business logic (usable client and server)', level: 4, dirPatterns: ['services', 'repositories'] },
+  { id: 'state', displayName: 'State management', description: 'Pinia stores, global state', level: 5, dirPatterns: ['stores', 'store'] },
+  { id: 'composables', displayName: 'Composables', description: 'Auto-imported composables (useFetch wrappers, shared reactive logic)', level: 6, dirPatterns: ['composables'] },
+  { id: 'plugins', displayName: 'Plugins', description: 'Nuxt plugins (client / server / both)', level: 6, dirPatterns: ['plugins'] },
+  { id: 'middleware', displayName: 'Route Middleware', description: 'Route guards and navigation middleware', level: 7, dirPatterns: ['middleware'] },
+  { id: 'components', displayName: 'Components', description: 'Auto-imported UI components', level: 8, dirPatterns: ['components', 'ui'] },
+  { id: 'layouts', displayName: 'Layouts', description: 'Shared page shells', level: 9, dirPatterns: ['layouts'] },
+  { id: 'pages', displayName: 'Pages', description: 'File-based routes', level: 10, dirPatterns: ['pages'], isLeaf: true },
+  { id: 'app', displayName: 'App Shell', description: 'app.vue, error.vue — top-level entry', level: 11, dirPatterns: ['app'], isLeaf: true },
+];
+
+/**
  * Minimal role set for libraries (no framework).
  */
 const LIBRARY_ROLES: LayerRole[] = [
@@ -270,7 +490,24 @@ const ROLES_BY_SYSTEM: Record<SystemType, LayerRole[]> = {
   library: LIBRARY_ROLES,
 };
 
-export function getRolesForSystemType(systemType: SystemType): LayerRole[] {
+/**
+ * Frameworks with their own canonical role set — these override the generic
+ * system-type ordering because they have framework-specific conventions
+ * (Angular's NgModules/pipes/directives, Vue's composables/plugins/layouts).
+ */
+const ROLES_BY_FRAMEWORK: Partial<Record<Framework, LayerRole[]>> = {
+  angular: ANGULAR_ROLES,
+  vue: VUE_ROLES,
+  nuxt: NUXT_ROLES,
+};
+
+export function getRolesForSystemType(
+  systemType: SystemType,
+  framework?: Framework,
+): LayerRole[] {
+  if (framework && ROLES_BY_FRAMEWORK[framework]) {
+    return ROLES_BY_FRAMEWORK[framework]!;
+  }
   return ROLES_BY_SYSTEM[systemType];
 }
 
@@ -284,8 +521,9 @@ export function matchRole(
   dirName: string,
   fileNames: string[],
   systemType: SystemType,
+  framework?: Framework,
 ): LayerRole | null {
-  const roles = getRolesForSystemType(systemType);
+  const roles = getRolesForSystemType(systemType, framework);
   const lowerDir = dirName.toLowerCase();
 
   // First pass: exact directory name match

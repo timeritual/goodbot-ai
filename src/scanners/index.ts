@@ -61,7 +61,7 @@ export async function runFullScan(projectRoot: string): Promise<ScanResult> {
 
   const [language, structure, verification, defaultBranch] = await Promise.all([
     detectLanguage(projectRoot),
-    analyzeStructure(projectRoot, systemType),
+    analyzeStructure(projectRoot, systemType, framework.framework),
     detectVerification(projectRoot),
     detectDefaultBranch(projectRoot),
   ]);

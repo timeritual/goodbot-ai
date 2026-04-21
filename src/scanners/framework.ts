@@ -13,13 +13,16 @@ export async function detectFramework(projectRoot: string): Promise<FrameworkDet
   const pkg = await safeReadJson<PackageJson>(path.join(projectRoot, 'package.json'));
   if (pkg) {
     const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
+    // Order matters: meta-frameworks (nuxt, next) must be checked before their base (vue, react)
     const checks: Array<{ key: string; framework: Framework }> = [
       { key: 'react-native', framework: 'react-native' },
       { key: 'next', framework: 'next' },
+      { key: 'nuxt', framework: 'nuxt' },
       { key: '@angular/core', framework: 'angular' },
       { key: '@nestjs/core', framework: 'nest' },
       { key: 'express', framework: 'express' },
       { key: 'react', framework: 'react' },
+      { key: 'vue', framework: 'vue' },
     ];
 
     for (const { key, framework } of checks) {

@@ -7,7 +7,8 @@ import { generateAll, buildContext } from '../generators/index.js';
 import { runFullScan } from '../scanners/index.js';
 import { runFullAnalysis, analyzeGitHistory, findTemporalCoupling } from '../analyzers/index.js';
 import type { FullAnalysis, GitHistoryAnalysis, TemporalCoupling } from '../analyzers/index.js';
-import { buildSnapshot, saveSnapshot, loadSnapshot } from '../freshness/index.js';
+import { buildSnapshot, saveSnapshot, loadSnapshot, snapshotToInsights } from '../freshness/index.js';
+import type { AnalysisInsights } from '../generators/index.js';
 import { log, safeWriteFile, safeReadFile, contentHash, fileExists } from '../utils/index.js';
 import { decideFileWrite, type ExistingFileStrategy } from './file-write-decision.js';
 
@@ -31,21 +32,23 @@ export const generateCommand = new Command('generate')
     let fullAnalysis: FullAnalysis | undefined;
     let gitHistory: GitHistoryAnalysis | undefined;
     let temporalCouplings: TemporalCoupling[] | undefined;
+    let cachedInsights: AnalysisInsights | undefined;
 
     // Always scan for framework patterns
     const scanSpinner = ora('Scanning project...').start();
     const scan = await runFullScan(projectRoot);
     scanSpinner.succeed('Scan complete');
 
-    // Auto-analyze on first run (no existing snapshot)
+    // Auto-analyze on first run (no existing snapshot). Otherwise reuse the cached snapshot.
     let shouldAnalyze = opts.analyze;
+    const existingSnapshot = await loadSnapshot(projectRoot);
     if (!shouldAnalyze) {
-      const existingSnapshot = await loadSnapshot(projectRoot);
       if (!existingSnapshot) {
         shouldAnalyze = true;
         log.info('First run detected — running analysis automatically.');
       } else {
-        log.dim('Skipping analysis (snapshot exists). Use --analyze to refresh.');
+        cachedInsights = snapshotToInsights(existingSnapshot);
+        log.dim(`Using cached analysis from snapshot (${cachedInsights.healthGrade}, ${cachedInsights.healthScore}/100). Use --analyze to refresh.`);
       }
     }
 
@@ -75,7 +78,7 @@ export const generateCommand = new Command('generate')
     const spinner = ora('Generating files...').start();
 
     try {
-      const files = await generateAll(config, fullAnalysis, gitHistory, temporalCouplings, scan.frameworkPatterns);
+      const files = await generateAll(config, fullAnalysis, gitHistory, temporalCouplings, scan.frameworkPatterns, cachedInsights);
       spinner.succeed(`Generated ${files.length} files`);
 
       const existingChecksums = await loadChecksums(projectRoot);

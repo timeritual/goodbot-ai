@@ -47,6 +47,7 @@ export function buildContext(
   gitHistory?: GitHistoryAnalysis,
   temporalCouplings?: TemporalCoupling[],
   frameworkPatterns?: FrameworkPatterns,
+  cachedInsights?: AnalysisInsights,
 ): GeneratorContext {
   const { project, architecture, businessLogic, verification, conventions, ignore } = config;
 
@@ -113,8 +114,10 @@ export function buildContext(
       stabilityViolationCount: analysisSummary.stabilityViolationCount,
       topViolations: analysisSummary.topViolations,
     } : undefined,
-    hasAnalysis: !!analysisSummary,
-    analysisInsights: fullAnalysis ? buildAnalysisInsights(fullAnalysis, gitHistory, temporalCouplings) : undefined,
+    hasAnalysis: !!analysisSummary || !!fullAnalysis || !!cachedInsights,
+    analysisInsights: fullAnalysis
+      ? buildAnalysisInsights(fullAnalysis, gitHistory, temporalCouplings)
+      : cachedInsights,
     frameworkPatterns: frameworkPatterns && (frameworkPatterns.conventions.length > 0 || frameworkPatterns.structuralNotes.length > 0)
       ? frameworkPatterns
       : undefined,

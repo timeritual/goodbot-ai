@@ -3,7 +3,7 @@ import type { FullAnalysis, GitHistoryAnalysis, TemporalCoupling } from '../anal
 import type { FrameworkPatterns } from '../scanners/index.js';
 import { buildContext } from './context-builder.js';
 import { renderTemplate } from './template-engine.js';
-import type { GeneratedFile } from './types.js';
+import type { AnalysisInsights, GeneratedFile } from './types.js';
 
 export type { AnalysisInsights } from './types.js';
 export { buildContext } from './context-builder.js';
@@ -32,8 +32,9 @@ export async function generateAll(
   gitHistory?: GitHistoryAnalysis,
   temporalCouplings?: TemporalCoupling[],
   frameworkPatterns?: FrameworkPatterns,
+  cachedInsights?: AnalysisInsights,
 ): Promise<GeneratedFile[]> {
-  const context = buildContext(config, undefined, fullAnalysis, gitHistory, temporalCouplings, frameworkPatterns);
+  const context = buildContext(config, undefined, fullAnalysis, gitHistory, temporalCouplings, frameworkPatterns, cachedInsights);
   const files: GeneratedFile[] = [];
 
   for (const entry of FILE_MAP) {

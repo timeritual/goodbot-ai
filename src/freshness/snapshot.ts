@@ -47,3 +47,42 @@ export async function loadSnapshot(
 ): Promise<AnalysisSnapshot | null> {
   return safeReadJson<AnalysisSnapshot>(snapshotPath(projectRoot));
 }
+
+/**
+ * Reconstruct AnalysisInsights from a saved snapshot so generate can surface
+ * the Current Health block on quick re-runs without re-running analysis.
+ * The has* boolean flags are derived from the cached count fields.
+ */
+export function snapshotToInsights(snapshot: AnalysisSnapshot): AnalysisInsights {
+  return {
+    healthGrade: snapshot.healthGrade,
+    healthScore: snapshot.healthScore,
+    circularDeps: snapshot.circularDeps,
+    barrelViolations: snapshot.barrelViolations,
+    layerViolations: snapshot.layerViolations,
+    srpViolations: snapshot.srpViolations,
+    complexityViolations: snapshot.complexityViolations,
+    duplicationClusters: snapshot.duplicationClusters,
+    deadExportCount: snapshot.deadExportCount,
+    shallowModules: snapshot.shallowModules,
+    godModules: snapshot.godModules,
+    oversizedFiles: snapshot.oversizedFiles,
+    highComplexityFiles: snapshot.highComplexityFiles,
+    deadExportModules: snapshot.deadExportModules,
+    hotspotFiles: snapshot.hotspotFiles,
+    aiCommitRatio: snapshot.aiCommitRatio,
+    temporalCouplings: snapshot.temporalCouplings,
+    hasCircularDeps: snapshot.circularDeps > 0,
+    hasBarrelViolations: snapshot.barrelViolations > 0,
+    hasLayerViolations: snapshot.layerViolations > 0,
+    hasSrpIssues: snapshot.srpViolations > 0,
+    hasComplexity: snapshot.complexityViolations > 0,
+    hasDuplication: snapshot.duplicationClusters > 0,
+    hasDeadExports: snapshot.deadExportCount > 0,
+    hasShallowModules: snapshot.shallowModules.length > 0,
+    hasGodModules: snapshot.godModules.length > 0,
+    hasHotspots: snapshot.hotspotFiles.length > 0,
+    hasTemporalCoupling: snapshot.temporalCouplings.length > 0,
+    hasHighAIRatio: snapshot.aiCommitRatio >= 30,
+  };
+}

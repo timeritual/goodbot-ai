@@ -92,6 +92,17 @@ goodbot init && goodbot generate
 
 ---
 
+## What's new in 0.6
+
+- **System type detection + role-based layers** — goodbot classifies your project as `api`, `ui`, `mixed`, or `library` and applies a canonical stability ordering (Stable Dependency Principle) per type. Framework-specific role sets for Angular, Vue, Nuxt, NestJS.
+- **Role-aware violation output** — layer violations render as `[Domain/Entities] domain (L0) imports from [Controllers/Transport] controllers (L7)` with a plain-English explanation of why the direction is wrong.
+- **Safer re-runs** — `generate` uses `<!-- goodbot:start/end -->` markers to preserve user content across regenerations. Running generate twice no longer wipes your team notes below the goodbot section.
+- **Cached-snapshot reuse** — subsequent `generate` runs (without `--analyze`) reuse the stored analysis snapshot, so the Current Health block still renders without re-running the full scan.
+- **CI-safe preset mode** — `goodbot init --preset recommended --on-conflict merge` skips all interactive prompts for automation.
+- **Auto-detected main branch** — uses `ls-remote` + commit-count heuristic to pick the real primary branch (e.g. `development` in GitFlow repos) instead of defaulting to `main`.
+
+---
+
 ## Commands
 
 ### `goodbot init`
@@ -121,13 +132,22 @@ $ goodbot init
 ✓ Config saved to .goodbot/config.json
 ```
 
-If existing agent files are detected (CLAUDE.md, .cursorrules, etc.), init asks whether to **merge** (prepend goodbot section, keep your content), **overwrite**, or **skip** them during generation. The default is merge.
+If existing agent files are detected (CLAUDE.md, .cursorrules, etc.), init asks whether to **merge** (prepend goodbot section, keep your content), **overwrite**, or **skip** them during generation. The default is merge. In `--preset` mode (CI-safe, non-interactive), pass `--on-conflict merge|overwrite|skip` to set the strategy without prompting.
+
+Main branch is auto-detected — goodbot tries `origin/HEAD`, then `git ls-remote` (authoritative), and falls back to picking whichever well-known branch (`main`, `master`, `development`, `develop`, `trunk`) has the most commits. So a GitFlow repo where `development` is primary gets `development` written to config automatically.
 
 Preview a preset before committing:
 
 ```bash
 goodbot init --preset recommended --dry-run
 ```
+
+| Flag | Description |
+|------|-------------|
+| `--preset <name>` | Non-interactive setup with `strict`, `recommended`, or `relaxed` preset |
+| `--on-conflict <strategy>` | How generate should handle existing agent files: `merge` (default), `overwrite`, or `skip` |
+| `--dry-run` | Preview preset config without writing (requires `--preset`) |
+| `--force` | Overwrite existing `.goodbot/config.json` without prompting |
 
 Saves everything to `.goodbot/config.json` — your single source of truth. Also creates `.goodbot/.gitignore` to keep local state files out of version control.
 
@@ -151,23 +171,31 @@ $ goodbot generate
 Snapshot saved for freshness tracking.
 ```
 
-On **first run**, goodbot automatically analyzes your codebase and generates **adaptive guardrails** — rules that reflect your actual codebase state, not just generic best practices. On subsequent runs, analysis is skipped (the CLI tells you why) — use `--analyze` to refresh:
+On **first run**, goodbot automatically analyzes your codebase and generates **adaptive guardrails** — rules that reflect your actual codebase state, not just generic best practices. On subsequent runs, goodbot reuses the cached snapshot so quick regens don't re-scan the whole codebase but still render the Current Health block:
 
 ```
 $ goodbot generate
 
 ✔ Scan complete
-  Skipping analysis (snapshot exists). Use --analyze to refresh.
+  Using cached analysis from snapshot (A, 94/100). Use --analyze to refresh.
 ✔ Generated 6 files
-...
+  CLAUDE.md — updating goodbot section (your content preserved)
+  CODING_GUIDELINES.md — no changes
+  ...
 ```
 
-If existing agent files are found (e.g., an existing CLAUDE.md), goodbot **prepends its content at the top** wrapped in `<!-- goodbot:start/end -->` markers, preserving your content below. On re-generation, only the marker section is replaced. This behavior is controlled by the `existingFileStrategy` in config (set during `goodbot init`) — options are `merge` (default), `overwrite`, or `skip`.
+**Re-run safety.** If existing agent files are found (e.g., an existing CLAUDE.md), goodbot wraps its output in `<!-- goodbot:start -->` / `<!-- goodbot:end -->` markers and **prepends it at the top**, preserving your content outside the markers. On every subsequent `generate`, only the marker section is replaced — your team notes, custom commands, project overview, etc. survive. This works even if `.goodbot/checksums.json` gets deleted: the markers are the contract.
+
+The behavior is controlled by `existingFileStrategy` in `.goodbot/config.json` (set during `goodbot init`):
+
+- **merge** (default) — prepend goodbot section with markers, preserve user content. On re-runs, replace only the marker section.
+- **overwrite** — fully replace existing agent files every time.
+- **skip** — don't touch files that already exist (safe for repos that manage their own CLAUDE.md).
 
 | Flag | Description |
 |------|-------------|
-| `--analyze` | Re-run analysis and refresh adaptive guardrails (automatic on first run) |
-| `--dry-run` | Preview what would be generated without writing |
+| `--analyze` | Re-run analysis and refresh cached snapshot (instead of reusing cache) |
+| `--dry-run` | Preview what would be generated — reports `(would update goodbot section, preserve your content)`, `(would create)`, `(would overwrite)`, `(would skip)`, or `(no changes)` |
 | `--force` | Overwrite existing files without prompting |
 
 ### `goodbot check`
@@ -714,10 +742,20 @@ All config lives in `.goodbot/config.json`. Here's what it controls:
     "language": "typescript"         // auto-detected
   },
   "architecture": {
-    "layers": [                      // your module layers
-      { "name": "types", "path": "src/types", "level": 0, "hasBarrel": true },
-      { "name": "services", "path": "src/services", "level": 4, "hasBarrel": true },
-      { "name": "screens", "path": "src/screens", "level": 8, "hasBarrel": false }
+    "systemType": "ui",              // auto-detected: ui | api | mixed | library
+    "layers": [                      // module layers with canonical roles
+      {
+        "name": "types", "path": "src/types", "level": 0, "hasBarrel": true,
+        "role": { "id": "types", "displayName": "Types/Constants", "description": "Shared type definitions and constants" }
+      },
+      {
+        "name": "services", "path": "src/services", "level": 4, "hasBarrel": true,
+        "role": { "id": "services", "displayName": "Services", "description": "Business logic, data transformation, orchestration" }
+      },
+      {
+        "name": "screens", "path": "src/screens", "level": 8, "hasBarrel": false,
+        "role": { "id": "screens", "displayName": "Screens/Pages", "description": "Route-level views", "isLeaf": true }
+      }
     ],
     "dependencyDirection": "downward",
     "barrelImportRule": "always",    // always | recommended | none
@@ -742,10 +780,11 @@ All config lives in `.goodbot/config.json`. Here's what it controls:
     "windsurfrules": true,
     "agentsMd": true,
     "cursorignore": true,
-    "codingGuidelines": true
+    "codingGuidelines": true,
+    "existingFileStrategy": "merge"  // merge | overwrite | skip
   },
   "conventions": {
-    "mainBranch": "main",
+    "mainBranch": "development",     // auto-detected from git
     "customRules": [
       "Use --legacy-peer-deps for npm installs",
       "Use device.disableSynchronization() in Detox tests"

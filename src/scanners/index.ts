@@ -33,22 +33,50 @@ interface PackageJson {
 }
 
 async function detectDefaultBranch(projectRoot: string): Promise<string> {
-  // Try remote HEAD first (most reliable for GitHub default branch)
+  // 1. Local origin/HEAD — authoritative when set (fast, no network)
   try {
     const { stdout } = await execFileAsync('git', ['symbolic-ref', 'refs/remotes/origin/HEAD'], { cwd: projectRoot });
-    const ref = stdout.trim(); // e.g. refs/remotes/origin/development
+    const ref = stdout.trim();
     if (ref) return ref.replace('refs/remotes/origin/', '');
   } catch {
-    // No remote HEAD set — fall through
+    // origin/HEAD not set — continue
   }
 
-  // Fall back to current branch
+  // 2. Ask origin directly (short network timeout). Authoritative — uses GitHub/remote's actual default.
+  try {
+    const { stdout } = await execFileAsync(
+      'git', ['ls-remote', '--symref', 'origin', 'HEAD'],
+      { cwd: projectRoot, timeout: 5000 },
+    );
+    const match = stdout.match(/^ref: refs\/heads\/(\S+)\s+HEAD/);
+    if (match) return match[1];
+  } catch {
+    // Network unavailable, unauthenticated, or timed out — continue
+  }
+
+  // 3. Look for well-known default branches on origin (no network — uses local remote-tracking refs).
+  //    Order matters: we pick the first match; `main` and `master` come before `develop*` because
+  //    most repos that have both use `main` as primary.
+  try {
+    const { stdout } = await execFileAsync(
+      'git', ['for-each-ref', '--format=%(refname:short)', 'refs/remotes/origin/'],
+      { cwd: projectRoot },
+    );
+    const remoteBranches = new Set(stdout.split('\n').map((b) => b.trim()).filter(Boolean));
+    for (const candidate of ['main', 'master', 'development', 'develop', 'trunk']) {
+      if (remoteBranches.has(`origin/${candidate}`)) return candidate;
+    }
+  } catch {
+    // Fall through
+  }
+
+  // 4. Current branch as last resort
   try {
     const { stdout } = await execFileAsync('git', ['branch', '--show-current'], { cwd: projectRoot });
     const branch = stdout.trim();
     if (branch) return branch;
   } catch {
-    // Not a git repo or git not available
+    // Not a git repo
   }
 
   return 'main';

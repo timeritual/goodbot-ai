@@ -1,6 +1,6 @@
 {
   "name": "goodbot-ai",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Auto-generate AI agent guardrail files for your project. Train your AI to be a good bot.",
   "type": "module",
   "bin": {

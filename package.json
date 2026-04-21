@@ -1,6 +1,6 @@
 {
   "name": "goodbot-ai",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Auto-generate AI agent guardrail files for your project. Train your AI to be a good bot.",
   "type": "module",
   "bin": {
@@ -14,7 +14,8 @@
   ],
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsc -p tsconfig.build.json && npm run copy-templates",
+    "build": "npm run clean && tsc -p tsconfig.build.json && npm run copy-templates",
+    "clean": "rm -rf dist",
     "copy-templates": "cp -r src/templates dist/templates",
     "start": "node dist/index.js",
     "lint": "eslint src/",

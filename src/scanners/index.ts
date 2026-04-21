@@ -54,17 +54,36 @@ async function detectDefaultBranch(projectRoot: string): Promise<string> {
     // Network unavailable, unauthenticated, or timed out — continue
   }
 
-  // 3. Look for well-known default branches on origin (no network — uses local remote-tracking refs).
-  //    Order matters: we pick the first match; `main` and `master` come before `develop*` because
-  //    most repos that have both use `main` as primary.
+  // 3. Compare commit counts across well-known default branches on origin (no network).
+  //    The primary branch almost always has the most commits — robust across GitFlow
+  //    (where `develop` has more than `main`) and trunk-based styles.
   try {
+    const candidates = ['main', 'master', 'development', 'develop', 'trunk'];
     const { stdout } = await execFileAsync(
       'git', ['for-each-ref', '--format=%(refname:short)', 'refs/remotes/origin/'],
       { cwd: projectRoot },
     );
     const remoteBranches = new Set(stdout.split('\n').map((b) => b.trim()).filter(Boolean));
-    for (const candidate of ['main', 'master', 'development', 'develop', 'trunk']) {
-      if (remoteBranches.has(`origin/${candidate}`)) return candidate;
+    const existing = candidates.filter((c) => remoteBranches.has(`origin/${c}`));
+
+    if (existing.length === 1) return existing[0];
+
+    if (existing.length > 1) {
+      const counts = await Promise.all(
+        existing.map(async (branch) => {
+          try {
+            const { stdout: out } = await execFileAsync(
+              'git', ['rev-list', '--count', `origin/${branch}`],
+              { cwd: projectRoot },
+            );
+            return { branch, count: parseInt(out.trim(), 10) || 0 };
+          } catch {
+            return { branch, count: 0 };
+          }
+        }),
+      );
+      counts.sort((a, b) => b.count - a.count);
+      if (counts[0].count > 0) return counts[0].branch;
     }
   } catch {
     // Fall through

@@ -29,6 +29,8 @@ AI agents are powerful but they don't know your rules. Without guardrails, they 
 2. **Make the rules adaptive.** Scans your actual codebase for framework conventions, architectural layers, and real violations — so guardrails match your code, not a generic template.
 3. **Detect when they go stale.** As your codebase evolves, goodbot tracks drift between what the guardrails claim and what the code actually looks like.
 
+> **New here?** Read **[HOW_IT_WORKS.md](./HOW_IT_WORKS.md)** for a plain-English walkthrough with a diagram of the full pipeline — what goodbot reads from your project, what it writes, and how drift detection works.
+
 ---
 
 ## Install & run (60 seconds)
@@ -399,7 +401,10 @@ npm install
 npx tsx src/index.ts --help    # run in dev mode
 ```
 
-See **[ARCHITECTURE.md](./ARCHITECTURE.md)** for a high-level map of how goodbot works — scan → analyze → generate pipeline, subsystem responsibilities, key design decisions, and extension points.
+Two docs to orient:
+
+- **[HOW_IT_WORKS.md](./HOW_IT_WORKS.md)** — end-user mental model (what goodbot does, what state it keeps, how drift detection works).
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** — contributor map (subsystem layout, key design decisions, extension points).
 
 Issues and PRs welcome.
 

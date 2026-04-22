@@ -166,9 +166,9 @@ export function diffConfigs(local: GoodbotConfig, merged: GoodbotConfig): string
     changes.push(`maxFileLines: ${local.analysis.thresholds.maxFileLines} → ${merged.analysis.thresholds.maxFileLines}`);
   }
 
-  // Ignore
-  if (local.ignore.paths.length !== merged.ignore.paths.length) {
-    changes.push(`ignore.paths: ${local.ignore.paths.length} → ${merged.ignore.paths.length}`);
+  // Cursorignore output
+  if (local.output.cursorignore.paths.length !== merged.output.cursorignore.paths.length) {
+    changes.push(`output.cursorignore.paths: ${local.output.cursorignore.paths.length} → ${merged.output.cursorignore.paths.length}`);
   }
 
   return changes;

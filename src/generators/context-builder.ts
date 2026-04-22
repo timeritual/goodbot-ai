@@ -49,7 +49,10 @@ export function buildContext(
   frameworkPatterns?: FrameworkPatterns,
   cachedInsights?: AnalysisInsights,
 ): GeneratorContext {
-  const { project, architecture, businessLogic, verification, conventions, ignore } = config;
+  const { project, architecture, businessLogic, verification, conventions, output } = config;
+  // Keep the template's `ignore` context slot as the cursorignore data — the
+  // template uses `{{#each ignore.paths}}` and we don't want to rename templates.
+  const ignore = output.cursorignore;
 
   const verificationCommands: Array<{ name: string; command: string }> = [];
   if (verification.typecheck) verificationCommands.push({ name: 'Type check', command: verification.typecheck });

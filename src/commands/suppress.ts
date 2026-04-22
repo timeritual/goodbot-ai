@@ -7,7 +7,7 @@ import { log } from '../utils/index.js';
 import type { CircularDependency, SolidViolation } from '../analyzers/types.js';
 import type { SuppressionRule } from '../analyzers/suppressions.js';
 
-/** Candidate violation that can be suppressed, with a stable ID for user selection */
+/** Candidate violation that can be suppressed, with a stable content-based ID. */
 interface Candidate {
   id: string;
   rule: SuppressionRule;
@@ -17,7 +17,7 @@ interface Candidate {
 
 export const suppressCommand = new Command('suppress')
   .description('List suppressible violations and emit paste-ready suppression entries')
-  .argument('[id]', 'Violation id from the list (e.g. c0, l2, s1). Omit to list everything.')
+  .argument('[id]', 'Content-based violation id (e.g. cycle-app-database, layer-src-scripts-migrate). Omit to list everything.')
   .option('-p, --path <path>', 'Project path', process.cwd())
   .option('-r, --reason <text>', 'Reason to attach to the suppression')
   .option('--apply', 'Write the suppression to .goodbot/config.json instead of printing', false)
@@ -46,7 +46,9 @@ export const suppressCommand = new Command('suppress')
 
     const match = candidates.find((c) => c.id === id);
     if (!match) {
-      log.error(`No violation with id "${id}". Run \`goodbot suppress\` (no args) to see the list.`);
+      log.error(`No violation with id "${id}".`);
+      log.dim('IDs are content-based (e.g. cycle-app-database). If this ID worked before, the underlying violation may have been fixed or its shape changed.');
+      log.dim('Run `goodbot suppress` (no args) to see current IDs.');
       process.exit(1);
     }
 
@@ -91,58 +93,102 @@ export const suppressCommand = new Command('suppress')
     }
   });
 
+// ─── ID generation ──────────────────────────────────────
+
+/**
+ * Short rule prefixes used in violation IDs. Readable form preferred over hashes
+ * so IDs tell you what they target at a glance.
+ */
+const RULE_PREFIX: Record<SuppressionRule, string> = {
+  circularDep: 'cycle',
+  layerViolation: 'layer',
+  barrelViolation: 'barrel',
+  stabilityViolation: 'stability',
+  oversizedFile: 'oversized',
+  complexity: 'complexity',
+  duplication: 'duplication',
+  deadExport: 'dead-export',
+  dependencyInversion: 'dip',
+  interfaceSegregation: 'isp',
+  shallowModule: 'shallow',
+  godModule: 'god',
+};
+
+/** Convert a path (or any string) into a stable slug: alphanumerics + dashes. */
+function slugify(raw: string): string {
+  return raw
+    .replace(/\.[a-zA-Z0-9]+$/, '') // strip extension
+    .replace(/[^a-zA-Z0-9]+/g, '-') // non-alnum → dash
+    .replace(/^-+|-+$/g, '')        // trim leading/trailing dashes
+    .toLowerCase();
+}
+
+function cycleId(cycle: CircularDependency): string {
+  // Dedupe + sort so the ID is invariant across direction and the
+  // trailing-repeat convention Tarjan's output uses.
+  const unique = Array.from(new Set(cycle.cycle)).sort();
+  return `${RULE_PREFIX.circularDep}-${unique.map(slugify).join('-')}`;
+}
+
+function fileBasedId(rule: SuppressionRule, file: string): string {
+  return `${RULE_PREFIX[rule]}-${slugify(file)}`;
+}
+
 // ─── Helpers ────────────────────────────────────────────
 
 function collectCandidates(
   analysis: Awaited<ReturnType<typeof runFullAnalysis>>,
 ): Candidate[] {
   const out: Candidate[] = [];
+  const seenIds = new Set<string>();
 
-  analysis.dependency.circularDependencies.forEach((cycle, i) => {
-    out.push({
-      id: `c${i}`,
+  const push = (candidate: Candidate) => {
+    // Stable IDs should be unique in practice. If two violations collide,
+    // fall back to appending a short disambiguator.
+    if (seenIds.has(candidate.id)) {
+      let n = 2;
+      while (seenIds.has(`${candidate.id}-${n}`)) n++;
+      candidate = { ...candidate, id: `${candidate.id}-${n}` };
+    }
+    seenIds.add(candidate.id);
+    out.push(candidate);
+  };
+
+  for (const cycle of analysis.dependency.circularDependencies) {
+    push({
+      id: cycleId(cycle),
       rule: 'circularDep',
       identifier: { cycle: formatCycleForConfig(cycle) },
       label: `cycle: ${cycle.cycle.join(' → ')}`,
     });
-  });
+  }
 
-  analysis.dependency.layerViolations.forEach((v, i) => {
-    out.push({
-      id: `l${i}`,
+  for (const v of analysis.dependency.layerViolations) {
+    push({
+      id: fileBasedId('layerViolation', v.file),
       rule: 'layerViolation',
       identifier: { file: v.file },
       label: `${v.file} (L${v.fromLevel} → L${v.toLevel})`,
     });
-  });
+  }
 
-  analysis.dependency.barrelViolations.forEach((v, i) => {
-    out.push({
-      id: `b${i}`,
+  for (const v of analysis.dependency.barrelViolations) {
+    push({
+      id: fileBasedId('barrelViolation', v.file),
       rule: 'barrelViolation',
       identifier: { file: v.file },
       label: `${v.file}: ${v.specifier}`,
     });
-  });
+  }
 
-  const solidViolations = analysis.solid.violations;
-  const solidByCategory = new Map<SuppressionRule, SolidViolation[]>();
-  for (const v of solidViolations) {
+  for (const v of analysis.solid.violations) {
     const category = categorizeSolid(v);
     if (!category) continue;
-    const list = solidByCategory.get(category) ?? [];
-    list.push(v);
-    solidByCategory.set(category, list);
-  }
-  for (const [category, vs] of solidByCategory.entries()) {
-    const prefix = CATEGORY_PREFIX[category];
-    vs.forEach((v, i) => {
-      out.push({
-        id: `${prefix}${i}`,
-        rule: category,
-        identifier: { file: v.file },
-        label: `${v.file}: ${v.message.substring(0, 80)}`,
-      });
+    push({
+      id: fileBasedId(category, v.file),
+      rule: category,
+      identifier: { file: v.file },
+      label: `${v.file}: ${v.message.substring(0, 80)}`,
     });
   }
 
@@ -162,9 +208,14 @@ function renderList(candidates: Candidate[]): void {
 
   console.log();
   log.dim('Detected violations (ignores bypassed — see everything):');
+  log.dim('IDs are content-based — stable as long as the violation exists. Fixing the violation makes the ID disappear.');
   console.log();
 
-  const order = ['circularDep', 'layerViolation', 'barrelViolation', 'stabilityViolation', 'oversizedFile', 'complexity', 'duplication', 'deadExport', 'dependencyInversion', 'interfaceSegregation', 'shallowModule', 'godModule'];
+  const order: SuppressionRule[] = [
+    'circularDep', 'layerViolation', 'barrelViolation', 'stabilityViolation',
+    'oversizedFile', 'complexity', 'duplication', 'deadExport',
+    'dependencyInversion', 'interfaceSegregation', 'shallowModule', 'godModule',
+  ];
   for (const rule of order) {
     const group = byRule[rule];
     if (!group || group.length === 0) continue;
@@ -191,18 +242,6 @@ function formatCycleForConfig(cycle: CircularDependency): string {
   return unique.join(' ↔ ');
 }
 
-const CATEGORY_PREFIX: Partial<Record<SuppressionRule, string>> = {
-  oversizedFile: 'o',
-  complexity: 'x',
-  duplication: 'd',
-  deadExport: 'de',
-  dependencyInversion: 'dip',
-  interfaceSegregation: 'isp',
-  shallowModule: 'sh',
-  godModule: 'g',
-  stabilityViolation: 's',
-};
-
 function categorizeSolid(v: SolidViolation): SuppressionRule | null {
   if (v.principle === 'SRP' && v.message.includes('lines (threshold')) return 'oversizedFile';
   if (v.principle === 'SRP' && v.message.toLowerCase().includes('complexity')) return 'complexity';
@@ -214,4 +253,3 @@ function categorizeSolid(v: SolidViolation): SuppressionRule | null {
   if (v.principle === 'ISP') return 'interfaceSegregation';
   return null;
 }
-

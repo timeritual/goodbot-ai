@@ -24,9 +24,9 @@ export function defaultAnalysisIgnore(framework: Framework): GoodbotConfig['anal
     case 'fastapi':
     case 'django':
     case 'flask':
-      return { circularDeps: entityGlobs };
+      return { circularDep: entityGlobs };
     case 'node':
-      return { circularDeps: entityGlobs };
+      return { circularDep: entityGlobs };
     default:
       return {};
   }
@@ -93,9 +93,11 @@ export function buildPresetConfig(
     },
     customRulesConfig: [],
     team: {},
-    ignore: {
-      paths: defaults.ignorePaths,
-      sensitiveFiles: ['.env', '.env.*', 'credentials.json', '*.pem', '*.key'],
+    output: {
+      cursorignore: {
+        paths: defaults.ignorePaths,
+        sensitiveFiles: ['.env', '.env.*', 'credentials.json', '*.pem', '*.key'],
+      },
     },
   };
 

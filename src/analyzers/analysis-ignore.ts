@@ -8,18 +8,18 @@ import type {
 } from './types.js';
 
 export type AnalysisIgnoreConfig = {
-  circularDeps?: string[];
-  layerViolations?: string[];
-  barrelViolations?: string[];
-  stabilityViolations?: string[];
-  oversizedFiles?: string[];
+  circularDep?: string[];
+  layerViolation?: string[];
+  barrelViolation?: string[];
+  stabilityViolation?: string[];
+  oversizedFile?: string[];
   complexity?: string[];
   duplication?: string[];
-  deadExports?: string[];
+  deadExport?: string[];
   dependencyInversion?: string[];
   interfaceSegregation?: string[];
-  shallowModules?: string[];
-  godModules?: string[];
+  shallowModule?: string[];
+  godModule?: string[];
 };
 
 /** Build a matcher that returns true if the path matches any of the patterns. */
@@ -97,7 +97,7 @@ interface SolidCategoryFilter {
 }
 
 const CATEGORY_FILTERS: Record<string, SolidCategoryFilter> = {
-  oversizedFiles: {
+  oversizedFile: {
     principle: 'SRP',
     messagePredicate: (m) => m.includes('lines (threshold'),
   },
@@ -109,7 +109,7 @@ const CATEGORY_FILTERS: Record<string, SolidCategoryFilter> = {
     principle: 'SRP',
     messagePredicate: (m) => m.toLowerCase().includes('duplicat'),
   },
-  deadExports: {
+  deadExport: {
     messagePredicate: (m) => m.includes('Dead export'),
   },
   dependencyInversion: {
@@ -118,10 +118,10 @@ const CATEGORY_FILTERS: Record<string, SolidCategoryFilter> = {
   interfaceSegregation: {
     principle: 'ISP',
   },
-  shallowModules: {
+  shallowModule: {
     messagePredicate: (m) => m.includes('Shallow module'),
   },
-  godModules: {
+  godModule: {
     messagePredicate: (m) => m.includes('God module'),
   },
 };

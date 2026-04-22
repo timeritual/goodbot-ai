@@ -56,7 +56,7 @@ export function mergeConfigWithPreset(
     analysis: existing.analysis,
     customRulesConfig: existing.customRulesConfig,
     team: existing.team,
-    ignore: existing.ignore,
+    output: existing.output,
   };
 }
 

@@ -233,11 +233,14 @@ All config lives in `.goodbot/config.json`. It's meant to be committed and share
   "analysis":      {
     "thresholds":   { "maxFileLines": 300, "maxBarrelExports": 15 },
     "budget":       { "circular": 0, "srp": 10 },
-    "ignore":       { "circularDeps": ["**/entities/**"] },
+    "ignore":       { "circularDep": ["**/entities/**"] },     // singular keys match `suppressions[].rule`
     "suppressions": [{ "rule": "layerViolation", "file": "src/scripts/migrate.ts", "reason": "..." }]
-  }
+  },
+  "output":        { "cursorignore": { "paths": ["dist", "build"], "sensitiveFiles": [".env"] } }
 }
 ```
+
+Old configs with `ignore.paths` or plural `analysis.ignore.circularDeps` still load — goodbot auto-migrates them and prints a deprecation warning. Re-save the config to persist the canonical shape.
 
 Edit directly or re-run `goodbot init` to regenerate (merges by default, preserves your edits).
 
@@ -256,14 +259,32 @@ Four knobs, pick based on intent:
 
 `ignore.paths` in config only affects `.cursorignore` output — it does NOT suppress analysis. Use one of the four knobs above.
 
-**Use `goodbot suppress` to add suppressions safely.** It lists detected violations with IDs and emits the correct JSON to paste (or apply directly with `--apply`). This avoids typos in cycle patterns and Unicode characters. Goodbot also warns loudly about any suppression that matches no detected violation — so typos / stale entries can't silently disable guardrails.
+**Use `goodbot suppress` to add suppressions safely.** IDs are content-based and stable — the ID for a cycle stays the same while the cycle exists, and disappears when you fix it. No more hand-typing Unicode `↔` or cycle patterns.
+
+```bash
+$ goodbot suppress
+    [cycle-app-database]              cycle: app → database → app
+    [layer-src-scripts-migrate]       src/scripts/migrate.ts (L4 → L5)
+    [oversized-src-generated-schema]  src/generated/schema.ts: File has 6000 lines
+
+$ goodbot suppress cycle-app-database --reason "Bootstrap wiring" --apply
+✓ Added suppression to .goodbot/config.json
+```
+
+Goodbot also warns loudly on every `analyze`/`generate` about any suppression that matches no detected violation — so typos / stale entries can't silently disable guardrails. If a CI script references `cycle-app-database` and the cycle is fixed, the next run errors clearly ("No violation with that id") instead of silently suppressing the wrong thing.
 
 ---
+
+## What's new in 0.10
+
+- **Consistent singular rule names.** `analysis.ignore.*` keys now match `analysis.suppressions[].rule` — both use singular (`circularDep`, `layerViolation`, `oversizedFile`). Old plural keys still work and are auto-migrated on load with a deprecation warning.
+- **`output.cursorignore` replaces top-level `ignore`.** The old `ignore.paths` field (which only affected `.cursorignore`, not analysis — a frequent source of confusion) is now `output.cursorignore.paths`. Auto-migrated on load.
+- **Stable content-based suppression IDs.** The IDs emitted by `goodbot suppress` are now content-based and invariant (e.g. `cycle-app-database`, `layer-src-scripts-migrate`, `oversized-src-user-service`) instead of positional (`c0`, `l0`). As long as the violation exists, the ID stays the same. When you fix it, the ID simply disappears — CI scripts that reference a fixed violation's ID fail loudly instead of silently suppressing the wrong thing.
 
 ## What's new in 0.9
 
 - **Orphaned-suppression warnings.** Suppressions that match no detected violation (typo in cycle pattern, renamed/deleted file, already-fixed bug) are flagged loudly on every `analyze` and `generate`. No more silently-dead suppressions lurking in config.
-- **`goodbot suppress` command.** Lists suppressible violations with stable IDs (`c0`, `l2`, `sh1`, etc.) and emits paste-ready JSON. `goodbot suppress c0 --reason "..." --apply` writes to config for you. No need to hand-type the Unicode `↔` character anymore.
+- **`goodbot suppress` command.** Lists suppressible violations with IDs and emits paste-ready JSON. `goodbot suppress <id> --reason "..." --apply` writes to config for you. No need to hand-type the Unicode `↔` character anymore.
 - **Broader cycle syntax.** `analysis.suppressions[*].cycle` now accepts all common forms: `a → b`, `a ↔ b`, `a -> b`, `a <-> b`, `a,b`, `a > b`, and the human-natural loop form `a → b → a`. All normalize to the same canonical cycle.
 
 ## What's new in 0.8

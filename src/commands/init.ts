@@ -412,9 +412,11 @@ export const initCommand = new Command('init')
       },
       customRulesConfig: [],
       team: {},
-      ignore: {
-        paths: defaults.ignorePaths,
-        sensitiveFiles: ['.env', '.env.*', 'credentials.json', '*.pem', '*.key'],
+      output: {
+        cursorignore: {
+          paths: defaults.ignorePaths,
+          sensitiveFiles: ['.env', '.env.*', 'credentials.json', '*.pem', '*.key'],
+        },
       },
     };
 

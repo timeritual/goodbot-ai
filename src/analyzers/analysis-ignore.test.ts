@@ -187,7 +187,7 @@ describe('filterSolidViolationsByCategory', () => {
       makeViolation({ file: 'src/services/user.service.ts' }),
     ];
     const result = filterSolidViolationsByCategory(vs, {
-      oversizedFiles: ['**/*.entity.ts'],
+      oversizedFile: ['**/*.entity.ts'],
     });
     expect(result).toHaveLength(1);
     expect(result[0].file).toBe('src/services/user.service.ts');
@@ -203,7 +203,7 @@ describe('filterSolidViolationsByCategory', () => {
       }),
     ];
     const result = filterSolidViolationsByCategory(vs, {
-      oversizedFiles: ['**/*.entity.ts'],
+      oversizedFile: ['**/*.entity.ts'],
     });
     expect(result).toHaveLength(1); // DIP violation kept
   });
@@ -222,7 +222,7 @@ describe('filterSolidViolationsByCategory', () => {
       }),
     ];
     const result = filterSolidViolationsByCategory(vs, {
-      oversizedFiles: ['**/*.entity.ts'],
+      oversizedFile: ['**/*.entity.ts'],
     });
     expect(result).toHaveLength(1);
     expect(result[0].message).toContain('complexity');

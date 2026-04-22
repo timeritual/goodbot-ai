@@ -1,6 +1,10 @@
 import path from 'node:path';
-import { safeReadJson, safeWriteJson, fileExists } from '../utils/index.js';
+import { safeReadJson, safeWriteJson, fileExists, log } from '../utils/index.js';
 import { GoodbotConfigSchema, type GoodbotConfig } from './schema.js';
+import { migrateLegacyConfig } from './migrate.js';
+
+// Deprecation warnings are printed at most once per process, per message.
+const warnedDeprecations = new Set<string>();
 
 export { GoodbotConfigSchema, type GoodbotConfig, type ArchitectureLayer } from './schema.js';
 export { frameworkDefaults } from './defaults.js';
@@ -33,7 +37,13 @@ export async function loadConfig(projectRoot: string): Promise<GoodbotConfig> {
   if (!raw) {
     throw new Error('No .goodbot/config.json found. Run `goodbot init` first.');
   }
-  return GoodbotConfigSchema.parse(raw);
+  const { migrated, deprecations } = migrateLegacyConfig(raw);
+  for (const msg of deprecations) {
+    if (warnedDeprecations.has(msg)) continue;
+    warnedDeprecations.add(msg);
+    log.warn(`config: ${msg}`);
+  }
+  return GoodbotConfigSchema.parse(migrated);
 }
 
 export async function saveConfig(projectRoot: string, config: GoodbotConfig): Promise<void> {

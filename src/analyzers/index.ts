@@ -239,10 +239,10 @@ export async function runFullAnalysis(
   // Apply analysis-scoped ignores from config (can be bypassed with --no-ignore)
   const scopedIgnore = config?.analysis.ignore;
   if (scopedIgnore && !options.noIgnore) {
-    dep.circularDependencies = filterCyclesByFile(dep.circularDependencies, scopedIgnore.circularDeps);
-    dep.layerViolations = filterLayerViolationsByFile(dep.layerViolations, scopedIgnore.layerViolations);
-    dep.barrelViolations = filterBarrelViolationsByFile(dep.barrelViolations, scopedIgnore.barrelViolations);
-    dep.stabilityViolations = filterStabilityViolationsByFile(dep.stabilityViolations, scopedIgnore.stabilityViolations);
+    dep.circularDependencies = filterCyclesByFile(dep.circularDependencies, scopedIgnore.circularDep);
+    dep.layerViolations = filterLayerViolationsByFile(dep.layerViolations, scopedIgnore.layerViolation);
+    dep.barrelViolations = filterBarrelViolationsByFile(dep.barrelViolations, scopedIgnore.barrelViolation);
+    dep.stabilityViolations = filterStabilityViolationsByFile(dep.stabilityViolations, scopedIgnore.stabilityViolation);
     solid.violations = filterSolidViolationsByCategory(solid.violations, scopedIgnore);
   }
 

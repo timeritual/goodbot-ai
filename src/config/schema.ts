@@ -77,14 +77,17 @@ export const GoodbotConfigSchema = z.object({
       deadExports: z.number().int().min(0).optional(),
       custom: z.number().int().min(0).optional(),
     }).default({}),
-    // Per-check file-glob suppressions. Files are still parsed for every check;
+    // Per-check file-glob exclusions. Files are still parsed for every check;
     // matched files just don't contribute to the listed categories. Use this
     // for well-known false positives (e.g., TypeORM entity cycles).
     //
+    // Renamed from `analysis.ignore` (kept its shape) to disambiguate from
+    // `output.cursorignore` — they no longer share the "ignore" keyword.
+    // The load migration rewrites the old key on save.
+    //
     // Key names match `suppressions[].rule` (singular). Plural legacy names
-    // (circularDeps, layerViolations, ...) are accepted but deprecated — the
-    // load migration rewrites them on save.
-    ignore: z.object({
+    // (circularDeps, layerViolations, ...) are also accepted via migration.
+    exclude: z.object({
       circularDep: z.array(z.string()).optional(),
       layerViolation: z.array(z.string()).optional(),
       barrelViolation: z.array(z.string()).optional(),

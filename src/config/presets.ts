@@ -11,12 +11,15 @@ export const PRESET_DESCRIPTIONS: Record<PresetName, string> = {
 };
 
 /**
- * Sensible out-of-the-box analysis-scoped ignores. Backend API frameworks
+ * Sensible out-of-the-box analysis exclusions. Backend API frameworks
  * commonly have ORM entity files that form bidirectional cycles via decorator
  * relationships (@OneToMany, @ManyToOne, etc.) — these are runtime-safe and
  * shouldn't inflate the circular-dep count.
+ *
+ * (Also exported as `defaultAnalysisIgnore` for backward compatibility; the
+ * `Ignore` name is deprecated in favour of `Exclude`.)
  */
-export function defaultAnalysisIgnore(framework: Framework): GoodbotConfig['analysis']['ignore'] {
+export function defaultAnalysisExclude(framework: Framework): GoodbotConfig['analysis']['exclude'] {
   const entityGlobs = ['**/entities/**', '**/models/**', '**/schemas/**'];
   switch (framework) {
     case 'nest':
@@ -31,6 +34,9 @@ export function defaultAnalysisIgnore(framework: Framework): GoodbotConfig['anal
       return {};
   }
 }
+
+/** @deprecated Use `defaultAnalysisExclude`. Kept for backward compatibility. */
+export const defaultAnalysisIgnore = defaultAnalysisExclude;
 
 export function buildPresetConfig(
   preset: PresetName,
@@ -88,7 +94,7 @@ export function buildPresetConfig(
       solid: true,
       thresholds: { maxFileLines: 300, maxBarrelExports: 15, maxModuleCoupling: 8 },
       budget: {},
-      ignore: defaultAnalysisIgnore(scan.framework.framework),
+      exclude: defaultAnalysisExclude(scan.framework.framework),
       suppressions: [],
     },
     customRulesConfig: [],

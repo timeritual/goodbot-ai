@@ -8,7 +8,7 @@ const warnedDeprecations = new Set<string>();
 
 export { GoodbotConfigSchema, type GoodbotConfig, type ArchitectureLayer } from './schema.js';
 export { frameworkDefaults } from './defaults.js';
-export { buildPresetConfig, defaultAnalysisIgnore, PRESET_DESCRIPTIONS, type PresetName } from './presets.js';
+export { buildPresetConfig, defaultAnalysisExclude, defaultAnalysisIgnore, PRESET_DESCRIPTIONS, type PresetName } from './presets.js';
 export { mergeConfigWithPreset, diffConfigs, type ConfigChange } from './merge.js';
 
 const CONFIG_DIR = '.goodbot';

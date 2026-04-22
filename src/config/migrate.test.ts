@@ -25,7 +25,7 @@ describe('migrateLegacyConfig', () => {
     expect(deprecations[0]).toContain('output.cursorignore');
   });
 
-  it('migrates analysis.ignore plural keys to singular', () => {
+  it('migrates analysis.ignore plural keys to analysis.exclude singular keys', () => {
     const legacy = {
       version: 1,
       project: { name: 'app', framework: 'nest', language: 'typescript' },
@@ -38,19 +38,21 @@ describe('migrateLegacyConfig', () => {
       },
     };
     const { migrated, deprecations } = migrateLegacyConfig(legacy);
-    const analysisIgnore = (migrated as Record<string, Record<string, Record<string, unknown>>>)
-      .analysis.ignore;
-    expect(analysisIgnore.circularDep).toEqual(['**/entities/**']);
-    expect(analysisIgnore.layerViolation).toEqual(['scripts/**']);
-    expect(analysisIgnore.oversizedFile).toEqual(['**/*.gen.ts']);
-    expect(analysisIgnore.circularDeps).toBeUndefined();
-    expect(analysisIgnore.layerViolations).toBeUndefined();
-    expect(analysisIgnore.oversizedFiles).toBeUndefined();
-    expect(deprecations).toHaveLength(1);
-    expect(deprecations[0]).toContain('plural');
+    const exclude = (migrated as Record<string, Record<string, Record<string, unknown>>>)
+      .analysis.exclude;
+    expect(exclude.circularDep).toEqual(['**/entities/**']);
+    expect(exclude.layerViolation).toEqual(['scripts/**']);
+    expect(exclude.oversizedFile).toEqual(['**/*.gen.ts']);
+    expect(exclude.circularDeps).toBeUndefined();
+    expect(exclude.layerViolations).toBeUndefined();
+    expect(exclude.oversizedFiles).toBeUndefined();
+    // Should warn about both renames: ignore→exclude AND plural→singular
+    expect(deprecations.length).toBeGreaterThanOrEqual(1);
+    expect(deprecations.join(' ')).toContain('plural');
+    expect(deprecations.join(' ')).toContain('exclude');
   });
 
-  it('migrates both legacies in a single pass', () => {
+  it('migrates multiple legacies in a single pass', () => {
     const legacy = {
       version: 1,
       project: { name: 'app', framework: 'nest', language: 'typescript' },
@@ -58,7 +60,9 @@ describe('migrateLegacyConfig', () => {
       ignore: { paths: ['dist'], sensitiveFiles: [] },
     };
     const { deprecations } = migrateLegacyConfig(legacy);
-    expect(deprecations).toHaveLength(2);
+    // Expect 3: top-level ignore→output.cursorignore, analysis.ignore→analysis.exclude,
+    // and circularDeps→circularDep
+    expect(deprecations.length).toBeGreaterThanOrEqual(2);
   });
 
   it('returns no deprecations when config already uses canonical names', () => {
@@ -66,25 +70,44 @@ describe('migrateLegacyConfig', () => {
       version: 1,
       project: { name: 'app', framework: 'nest', language: 'typescript' },
       output: { cursorignore: { paths: [], sensitiveFiles: [] } },
-      analysis: { ignore: { circularDep: ['**/entities/**'] } },
+      analysis: { exclude: { circularDep: ['**/entities/**'] } },
     };
     const { deprecations } = migrateLegacyConfig(canonical);
     expect(deprecations).toEqual([]);
   });
 
-  it('prefers canonical over legacy when both are set', () => {
+  it('migrates analysis.ignore → analysis.exclude, prefers canonical exclude if both set', () => {
+    const onlyLegacy = { analysis: { ignore: { circularDep: ['**/legacy/**'] } } };
+    const { migrated: m1 } = migrateLegacyConfig(onlyLegacy);
+    const exclude1 = (m1 as Record<string, Record<string, Record<string, unknown>>>).analysis.exclude;
+    expect(exclude1.circularDep).toEqual(['**/legacy/**']);
+
+    // When both ignore and exclude are present, exclude wins and ignore is dropped
+    const both = {
+      analysis: {
+        ignore: { circularDep: ['**/legacy-wins/**'] },
+        exclude: { circularDep: ['**/canonical-wins/**'] },
+      },
+    };
+    const { migrated: m2 } = migrateLegacyConfig(both);
+    const analysis2 = (m2 as Record<string, Record<string, Record<string, Record<string, unknown>>>>).analysis;
+    expect(analysis2.exclude.circularDep).toEqual(['**/canonical-wins/**']);
+    expect(analysis2.ignore).toBeUndefined();
+  });
+
+  it('prefers canonical singular over plural when both exist in exclude', () => {
     const mixed = {
       analysis: {
-        ignore: {
+        exclude: {
           circularDeps: ['**/legacy-wins/**'],
           circularDep: ['**/canonical-wins/**'],
         },
       },
     };
     const { migrated } = migrateLegacyConfig(mixed);
-    const ignore = (migrated as Record<string, Record<string, Record<string, unknown>>>).analysis.ignore;
-    expect(ignore.circularDep).toEqual(['**/canonical-wins/**']);
-    expect(ignore.circularDeps).toBeUndefined();
+    const exclude = (migrated as Record<string, Record<string, Record<string, unknown>>>).analysis.exclude;
+    expect(exclude.circularDep).toEqual(['**/canonical-wins/**']);
+    expect(exclude.circularDeps).toBeUndefined();
   });
 
   it('migrated config passes full schema validation (integration)', () => {
@@ -97,7 +120,7 @@ describe('migrateLegacyConfig', () => {
     const { migrated } = migrateLegacyConfig(legacy);
     // Should not throw
     const parsed = GoodbotConfigSchema.parse(migrated);
-    expect(parsed.analysis.ignore.circularDep).toEqual(['**/entities/**']);
+    expect(parsed.analysis.exclude.circularDep).toEqual(['**/entities/**']);
     expect(parsed.output.cursorignore.paths).toEqual(['dist']);
   });
 

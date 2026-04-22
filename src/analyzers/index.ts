@@ -236,14 +236,14 @@ export async function runFullAnalysis(
   dep.barrelViolations = filterBarrelViolations(dep.barrelViolations, ignoreRules);
   solid.violations = filterSolidViolations(solid.violations, ignoreRules);
 
-  // Apply analysis-scoped ignores from config (can be bypassed with --no-ignore)
-  const scopedIgnore = config?.analysis.ignore;
-  if (scopedIgnore && !options.noIgnore) {
-    dep.circularDependencies = filterCyclesByFile(dep.circularDependencies, scopedIgnore.circularDep);
-    dep.layerViolations = filterLayerViolationsByFile(dep.layerViolations, scopedIgnore.layerViolation);
-    dep.barrelViolations = filterBarrelViolationsByFile(dep.barrelViolations, scopedIgnore.barrelViolation);
-    dep.stabilityViolations = filterStabilityViolationsByFile(dep.stabilityViolations, scopedIgnore.stabilityViolation);
-    solid.violations = filterSolidViolationsByCategory(solid.violations, scopedIgnore);
+  // Apply analysis-scoped exclusions from config (can be bypassed with --no-ignore)
+  const exclude = config?.analysis.exclude;
+  if (exclude && !options.noIgnore) {
+    dep.circularDependencies = filterCyclesByFile(dep.circularDependencies, exclude.circularDep);
+    dep.layerViolations = filterLayerViolationsByFile(dep.layerViolations, exclude.layerViolation);
+    dep.barrelViolations = filterBarrelViolationsByFile(dep.barrelViolations, exclude.barrelViolation);
+    dep.stabilityViolations = filterStabilityViolationsByFile(dep.stabilityViolations, exclude.stabilityViolation);
+    solid.violations = filterSolidViolationsByCategory(solid.violations, exclude);
   }
 
   // Apply per-violation suppressions. These are tracked separately so we can

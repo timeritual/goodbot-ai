@@ -234,14 +234,14 @@ All config lives in `.goodbot/config.json`. It's meant to be committed and share
   "analysis":      {
     "thresholds":   { "maxFileLines": 300, "maxBarrelExports": 15 },
     "budget":       { "circular": 0, "srp": 10 },
-    "ignore":       { "circularDep": ["**/entities/**"] },     // singular keys match `suppressions[].rule`
+    "exclude":      { "circularDep": ["**/entities/**"] },     // analysis-scoped exclusions — singular keys match `suppressions[].rule`
     "suppressions": [{ "rule": "layerViolation", "file": "src/scripts/migrate.ts", "reason": "..." }]
   },
   "output":        { "cursorignore": { "paths": ["dist", "build"], "sensitiveFiles": [".env"] } }
 }
 ```
 
-Old configs with `ignore.paths` or plural `analysis.ignore.circularDeps` still load — goodbot auto-migrates them and prints a deprecation warning. Re-save the config to persist the canonical shape.
+Old configs with `ignore.paths`, `analysis.ignore`, or plural `circularDeps` keys still load — goodbot auto-migrates them and prints a deprecation warning. Re-save the config to persist the canonical shape.
 
 Edit directly or re-run `goodbot init` to regenerate (merges by default, preserves your edits).
 
@@ -254,7 +254,7 @@ Four knobs, pick based on intent:
 | Knob | Scope | When to use |
 |------|-------|-------------|
 | `analysis.suppressions` | Exact file/cycle + rule + **required reason** | You accept this specific violation intentionally. Shows as `(N suppressed)` in output. |
-| `analysis.ignore.*` | Glob pattern per check category | Well-known false positives (TypeORM entity cycles, generated code). Doesn't appear at all. |
+| `analysis.exclude.*` | Glob pattern per check category | Well-known false positives (TypeORM entity cycles, generated code). Doesn't appear at all. |
 | `.goodbot/ignore` | File paths → all checks | Legacy / vendored code you never want analyzed. |
 | Violation budgets | Per-category threshold | Known debt you want visible but not failing CI until it grows past a limit. |
 
@@ -280,6 +280,10 @@ $ goodbot unsuppress cycle-app-database
 Goodbot also warns loudly on every `analyze`/`generate` about any suppression that matches no detected violation — so typos / stale entries can't silently disable guardrails. If a CI script references `cycle-app-database` and the cycle is fixed, the next run errors clearly ("No violation with that id") instead of silently suppressing the wrong thing.
 
 ---
+
+## What's new in 0.13
+
+- **`analysis.ignore` renamed to `analysis.exclude`.** Disambiguates from `output.cursorignore` — the word "ignore" now only appears in the filename-scoped cursorignore. Old `analysis.ignore` still loads, auto-migrates on save with a deprecation warning.
 
 ## What's new in 0.12
 

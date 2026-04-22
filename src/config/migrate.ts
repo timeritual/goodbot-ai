@@ -49,25 +49,41 @@ export function migrateLegacyConfig(raw: unknown): MigrationResult {
     deprecations.push('`ignore` has been renamed to `output.cursorignore` (affects .cursorignore generation only, not analysis). Your config has been migrated — save to persist the new shape.');
   }
 
-  // ─── analysis.ignore plural keys → singular ─────────────
+  // ─── analysis.ignore → analysis.exclude ─────────────────
+  //     + plural keys (circularDeps, ...) → singular (circularDep, ...)
   if (isObject(cfg.analysis)) {
     const analysis: Record<string, unknown> = { ...cfg.analysis };
-    if (isObject(analysis.ignore)) {
-      const ignore: Record<string, unknown> = { ...analysis.ignore };
+
+    // Rename analysis.ignore → analysis.exclude (keep both temporarily for
+    // transition; the singular-rename loop below applies to whichever key
+    // is present).
+    if (isObject(analysis.ignore) && !isObject(analysis.exclude)) {
+      analysis.exclude = analysis.ignore;
+      delete analysis.ignore;
+      deprecations.push('`analysis.ignore` has been renamed to `analysis.exclude` (to disambiguate from `output.cursorignore`). Your config has been migrated — save to persist.');
+    } else if (isObject(analysis.ignore) && isObject(analysis.exclude)) {
+      // Both set — prefer exclude (canonical), drop ignore, warn.
+      delete analysis.ignore;
+      deprecations.push('Both `analysis.ignore` (legacy) and `analysis.exclude` (canonical) are set — the legacy key was dropped. Only `analysis.exclude` is used.');
+    }
+
+    if (isObject(analysis.exclude)) {
+      const exclude: Record<string, unknown> = { ...analysis.exclude };
       const renamed: string[] = [];
       for (const [legacy, canonical] of Object.entries(ANALYSIS_IGNORE_RENAMES)) {
-        if (legacy in ignore) {
-          // If both exist, the singular/canonical form wins; drop the legacy copy.
-          if (!(canonical in ignore)) {
-            ignore[canonical] = ignore[legacy];
+        if (legacy in exclude) {
+          if (!(canonical in exclude)) {
+            exclude[canonical] = exclude[legacy];
           }
-          delete ignore[legacy];
+          delete exclude[legacy];
           renamed.push(`${legacy} → ${canonical}`);
         }
       }
       if (renamed.length > 0) {
-        analysis.ignore = ignore;
-        deprecations.push(`\`analysis.ignore\` uses deprecated plural keys — renamed: ${renamed.join(', ')}. Save to persist the canonical (singular) form.`);
+        analysis.exclude = exclude;
+        deprecations.push(`\`analysis.exclude\` uses deprecated plural keys — renamed: ${renamed.join(', ')}. Save to persist the canonical (singular) form.`);
+      } else {
+        analysis.exclude = exclude;
       }
     }
     cfg.analysis = analysis;

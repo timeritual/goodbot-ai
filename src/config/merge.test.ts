@@ -66,13 +66,13 @@ describe('mergeConfigWithPreset', () => {
     expect(merged.conventions.customRules).toEqual(['Use --legacy-peer-deps', 'Run migrations before tests']);
   });
 
-  it('preserves user analysis thresholds, budget, and ignore rules', () => {
+  it('preserves user analysis thresholds, budget, and exclude rules', () => {
     const existing = makeConfig({
       analysis: {
         solid: true,
         thresholds: { maxFileLines: 500, maxBarrelExports: 25, maxModuleCoupling: 12 },
         budget: { circular: 3, srp: 20 },
-        ignore: { circularDep: ['**/legacy/**'] },
+        exclude: { circularDep: ['**/legacy/**'] },
         suppressions: [{ rule: 'layerViolation', file: 'scripts/migrate.ts', reason: 'migration needs services' }],
       },
     });
@@ -81,14 +81,14 @@ describe('mergeConfigWithPreset', () => {
         solid: true,
         thresholds: { maxFileLines: 300, maxBarrelExports: 15, maxModuleCoupling: 8 },
         budget: {},
-        ignore: { circularDep: ['**/entities/**'] },
+        exclude: { circularDep: ['**/entities/**'] },
         suppressions: [],
       },
     });
     const merged = mergeConfigWithPreset(existing, preset);
     expect(merged.analysis.thresholds.maxFileLines).toBe(500);
     expect(merged.analysis.budget.circular).toBe(3);
-    expect(merged.analysis.ignore.circularDep).toEqual(['**/legacy/**']);
+    expect(merged.analysis.exclude.circularDep).toEqual(['**/legacy/**']);
     expect(merged.analysis.suppressions).toHaveLength(1);
   });
 

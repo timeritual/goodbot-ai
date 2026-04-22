@@ -328,6 +328,62 @@ Works with anything that reads one of the standard guardrail files:
 
 ---
 
+## Troubleshooting
+
+<details>
+<summary><strong>I already have a CLAUDE.md with my team's notes — will goodbot overwrite it?</strong></summary>
+
+No. Goodbot wraps its content between `<!-- goodbot:start -->` / `<!-- goodbot:end -->` markers and prepends at the top. Your content below the markers is preserved across every re-run. On regeneration, only the marker section is replaced. You can change this via `agentFiles.existingFileStrategy` in config (`merge` / `overwrite` / `skip`) or pass `--on-conflict` to `init`.
+</details>
+
+<details>
+<summary><strong>Running <code>init</code> a second time wiped my custom typecheck command.</strong></summary>
+
+It shouldn't, as of 0.8.0. Re-running `init` now merges the preset into your existing config — only scan-detected fields (framework, layers, systemType) get refreshed, everything you've hand-edited (verification commands, custom rules, suppressions, thresholds) is preserved. If you want a full reset, pass `--force`. If you're on an older version, upgrade: `npm install -g goodbot-ai@latest`.
+</details>
+
+<details>
+<summary><strong>My CI passes but a stale suppression is hiding a real violation.</strong></summary>
+
+Add `--strict` to `goodbot check` in CI — it fails when any `analysis.suppressions` entry no longer matches a real detected violation, so stale entries can't silently disable guardrails.
+
+```yaml
+- run: npx goodbot-ai check --strict
+```
+
+Locally, `goodbot suppress` (no args) lists current violations with IDs, and `goodbot analyze` flags orphaned suppressions loudly in stderr.
+</details>
+
+<details>
+<summary><strong>Circular dependency count is inflated by ORM entity relationships (TypeORM, Mongoose).</strong></summary>
+
+The `recommended` preset for NestJS / Express / Node / FastAPI / Django / Flask automatically adds `analysis.exclude.circularDep: ["**/entities/**", "**/models/**", "**/schemas/**"]`, which drops cycles whose files all match the pattern. If you have entities in a different directory, add your path to that list.
+
+For a specific cycle you want to accept (with a reason), use `goodbot suppress cycle-<modules>`.
+</details>
+
+<details>
+<summary><strong>Goodbot installed git hooks but <code>npm install</code> seems to overwrite them.</strong></summary>
+
+Fixed in 0.11.0. Husky v9 sets `core.hooksPath=.husky/_` (husky's internal dir, regenerated on every install). Goodbot now detects this and installs into `.husky/` (user-facing) instead, so changes survive husky reinstalls. Upgrade to 0.11.0+ if you're hitting this.
+</details>
+
+<details>
+<summary><strong>The freshness report says "stale" even though my changes improved the codebase.</strong></summary>
+
+"Stale" means "your snapshot no longer reflects reality" — regardless of direction. Improvements are tracked too (look for `↑ improved` rows in the report). After major improvements, re-run `goodbot generate --analyze --force` to refresh the snapshot so the baseline reflects your new state.
+</details>
+
+<details>
+<summary><strong>Main branch detected as "main" but ours is "development".</strong></summary>
+
+As of 0.6.3, goodbot detects the default branch via (in order): local `origin/HEAD` → `git ls-remote --symref origin HEAD` (authoritative network call, 5s timeout) → commit-count heuristic across `main`/`master`/`development`/`develop`/`trunk`. If ls-remote fails (e.g. private repo without credentials in the CLI context), it falls back to the branch with the most commits — which for GitFlow-style repos correctly picks `development`.
+
+You can always edit `conventions.mainBranch` directly in `.goodbot/config.json` — `init` will preserve that on re-runs.
+</details>
+
+---
+
 ## Why "goodbot"?
 
 AI coding agents are like eager interns — fast, capable, and in desperate need of clear rules. **goodbot** is obedience training for your AI: set the rules once, enforce them everywhere, catch drift before it ships.
@@ -342,6 +398,8 @@ cd goodbot-ai
 npm install
 npx tsx src/index.ts --help    # run in dev mode
 ```
+
+See **[ARCHITECTURE.md](./ARCHITECTURE.md)** for a high-level map of how goodbot works — scan → analyze → generate pipeline, subsystem responsibilities, key design decisions, and extension points.
 
 Issues and PRs welcome.
 

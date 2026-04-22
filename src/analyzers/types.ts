@@ -74,6 +74,18 @@ export interface BarrelViolation {
 export interface SuppressionSummary {
   total: number;
   byRule: Record<string, number>;
+  /**
+   * Suppressions from config that didn't match any detected violation.
+   * Likely indicates a typo in cycle pattern, a deleted/renamed file,
+   * or a violation that's been fixed since the suppression was added.
+   */
+  orphaned: Array<{
+    index: number;
+    rule: string;
+    file?: string;
+    cycle?: string;
+    reason: string;
+  }>;
 }
 
 /** A layer ordering violation */

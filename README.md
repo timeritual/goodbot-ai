@@ -190,6 +190,7 @@ Plus internal state in `.goodbot/`:
 | `goodbot analyze` | Full architectural audit — dependency graph, SOLID, layer violations, health grade. |
 | `goodbot diff` | Show violations introduced by the current branch (vs base). Great for PR review. |
 | `goodbot hooks install` | Install git hooks that warn on stale guardrails. |
+| `goodbot suppress` | List detected violations with IDs; emit paste-ready suppression JSON. `--apply` writes to config. |
 | `goodbot score` | One-line health grade. Fast enough for pre-commit hooks. |
 | `goodbot presets` | Side-by-side comparison of the strict/recommended/relaxed presets. |
 
@@ -255,7 +256,15 @@ Four knobs, pick based on intent:
 
 `ignore.paths` in config only affects `.cursorignore` output — it does NOT suppress analysis. Use one of the four knobs above.
 
+**Use `goodbot suppress` to add suppressions safely.** It lists detected violations with IDs and emits the correct JSON to paste (or apply directly with `--apply`). This avoids typos in cycle patterns and Unicode characters. Goodbot also warns loudly about any suppression that matches no detected violation — so typos / stale entries can't silently disable guardrails.
+
 ---
+
+## What's new in 0.9
+
+- **Orphaned-suppression warnings.** Suppressions that match no detected violation (typo in cycle pattern, renamed/deleted file, already-fixed bug) are flagged loudly on every `analyze` and `generate`. No more silently-dead suppressions lurking in config.
+- **`goodbot suppress` command.** Lists suppressible violations with stable IDs (`c0`, `l2`, `sh1`, etc.) and emits paste-ready JSON. `goodbot suppress c0 --reason "..." --apply` writes to config for you. No need to hand-type the Unicode `↔` character anymore.
+- **Broader cycle syntax.** `analysis.suppressions[*].cycle` now accepts all common forms: `a → b`, `a ↔ b`, `a -> b`, `a <-> b`, `a,b`, `a > b`, and the human-natural loop form `a → b → a`. All normalize to the same canonical cycle.
 
 ## What's new in 0.8
 

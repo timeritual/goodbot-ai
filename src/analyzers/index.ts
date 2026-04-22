@@ -247,36 +247,60 @@ export async function runFullAnalysis(
   }
 
   // Apply per-violation suppressions. These are tracked separately so we can
-  // report "(N suppressed)" in the analyze output.
+  // report "(N suppressed)" in the analyze output and warn about suppressions
+  // that match nothing (typos, renamed files, etc).
   const suppressions = config?.analysis.suppressions ?? [];
   let suppressionSummary: FullAnalysis['suppressions'];
   if (suppressions.length > 0 && !options.noIgnore) {
     const byRule: Record<string, number> = {};
+    const matchedIndices = new Set<number>();
+
+    const mergeMatched = (indices: Set<number>): void => {
+      for (const i of indices) matchedIndices.add(i);
+    };
 
     const cycleResult = applySuppressionsToCycles(dep.circularDependencies, suppressions);
     dep.circularDependencies = cycleResult.remaining;
+    mergeMatched(cycleResult.matchedIndices);
     if (cycleResult.suppressed.length > 0) byRule.circularDep = cycleResult.suppressed.length;
 
     const layerResult = applySuppressionsToLayerViolations(dep.layerViolations, suppressions);
     dep.layerViolations = layerResult.remaining;
+    mergeMatched(layerResult.matchedIndices);
     if (layerResult.suppressed.length > 0) byRule.layerViolation = layerResult.suppressed.length;
 
     const barrelResult = applySuppressionsToBarrelViolations(dep.barrelViolations, suppressions);
     dep.barrelViolations = barrelResult.remaining;
+    mergeMatched(barrelResult.matchedIndices);
     if (barrelResult.suppressed.length > 0) byRule.barrelViolation = barrelResult.suppressed.length;
 
     const stabilityResult = applySuppressionsToStabilityViolations(dep.stabilityViolations, suppressions);
     dep.stabilityViolations = stabilityResult.remaining;
+    mergeMatched(stabilityResult.matchedIndices);
     if (stabilityResult.suppressed.length > 0) byRule.stabilityViolation = stabilityResult.suppressed.length;
 
     const solidResult = applySuppressionsToSolidViolations(solid.violations, suppressions);
     solid.violations = solidResult.remaining;
+    mergeMatched(solidResult.matchedIndices);
     for (const [rule, count] of Object.entries(solidResult.countsByRule)) {
       if (count) byRule[rule] = (byRule[rule] ?? 0) + count;
     }
 
+    const orphaned = suppressions
+      .map((s, index) => ({ index, suppression: s }))
+      .filter(({ index }) => !matchedIndices.has(index))
+      .map(({ index, suppression }) => ({
+        index,
+        rule: suppression.rule,
+        file: suppression.file,
+        cycle: suppression.cycle,
+        reason: suppression.reason,
+      }));
+
     const total = Object.values(byRule).reduce((a, b) => a + b, 0);
-    if (total > 0) suppressionSummary = { total, byRule };
+    if (total > 0 || orphaned.length > 0) {
+      suppressionSummary = { total, byRule, orphaned };
+    }
   }
 
   // Health score (calculated AFTER ignores + suppressions)

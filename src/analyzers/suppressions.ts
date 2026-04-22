@@ -27,32 +27,11 @@ export interface Suppression {
   reason: string;
 }
 
-export interface SuppressionCounts {
-  circularDep: number;
-  layerViolation: number;
-  barrelViolation: number;
-  stabilityViolation: number;
-  oversizedFile: number;
-  complexity: number;
-  duplication: number;
-  deadExport: number;
-  dependencyInversion: number;
-  interfaceSegregation: number;
-  shallowModule: number;
-  godModule: number;
-}
-
-export function emptySuppressionCounts(): SuppressionCounts {
-  return {
-    circularDep: 0, layerViolation: 0, barrelViolation: 0, stabilityViolation: 0,
-    oversizedFile: 0, complexity: 0, duplication: 0, deadExport: 0,
-    dependencyInversion: 0, interfaceSegregation: 0, shallowModule: 0, godModule: 0,
-  };
-}
-
 export interface SuppressionResult<T> {
   remaining: T[];
   suppressed: T[];
+  /** Indices (into the original suppressions array) of entries that matched at least one violation. */
+  matchedIndices: Set<number>;
 }
 
 /** Normalize a cycle path for matching: sort module names, join with " → " */
@@ -62,46 +41,66 @@ function cycleKey(cycle: string[]): string {
   return [...unique].sort().join(' → ');
 }
 
-function parseCyclePattern(pattern: string): string {
-  // Accept patterns like "database → app" or "database ↔ app" or "database,app"
-  return pattern
-    .split(/[→↔,>]/)
+/**
+ * Parse a cycle pattern string from config into a canonical form.
+ *
+ * Accepts all common separators:
+ *   "a → b"     (Unicode arrow)
+ *   "a ↔ b"     (Unicode bidirectional)
+ *   "a -> b"    (ASCII arrow)
+ *   "a <-> b"   (ASCII bidirectional)
+ *   "a, b"      (comma)
+ *   "a > b"     (plain greater-than)
+ *
+ * Output: modules sorted alphabetically, joined with " → ".
+ */
+export function parseCyclePattern(pattern: string): string {
+  const parts = pattern
+    .split(/\s*(?:→|↔|<->|->|<-|>|,)\s*/)
     .map((s) => s.trim())
-    .filter(Boolean)
-    .sort()
-    .join(' → ');
+    .filter(Boolean);
+  // Dedupe so "a -> b -> a" (user showing the loop) matches "a → b" canonical
+  const unique = Array.from(new Set(parts));
+  return unique.sort().join(' → ');
 }
 
-// ─── Filter each violation kind ──────────────────────────
+// ─── Circular dep suppressions ──────────────────────────
 
 export function applySuppressionsToCycles(
   cycles: CircularDependency[],
   suppressions: Suppression[],
 ): SuppressionResult<CircularDependency> {
-  const cycleSuppressions = suppressions
-    .filter((s) => s.rule === 'circularDep' && s.cycle)
-    .map((s) => parseCyclePattern(s.cycle!));
-
+  const matchedIndices = new Set<number>();
   const remaining: CircularDependency[] = [];
   const suppressed: CircularDependency[] = [];
 
   for (const cycle of cycles) {
     const key = cycleKey(cycle.cycle);
-    if (cycleSuppressions.includes(key)) {
-      suppressed.push(cycle);
-    } else {
-      remaining.push(cycle);
+    let matched = false;
+    for (let i = 0; i < suppressions.length; i++) {
+      const s = suppressions[i];
+      if (s.rule !== 'circularDep' || !s.cycle) continue;
+      if (parseCyclePattern(s.cycle) === key) {
+        matchedIndices.add(i);
+        matched = true;
+      }
     }
+    if (matched) suppressed.push(cycle);
+    else remaining.push(cycle);
   }
 
-  return { remaining, suppressed };
+  return { remaining, suppressed, matchedIndices };
 }
+
+// ─── Per-file violation suppressions ────────────────────
 
 function matchesFile(violationFile: string, suppressionFile: string | undefined): boolean {
   if (!suppressionFile) return false;
-  return violationFile === suppressionFile ||
+  return (
+    violationFile === suppressionFile ||
     violationFile.endsWith(suppressionFile) ||
-    suppressionFile.endsWith(violationFile);
+    suppressionFile.endsWith(violationFile)
+  );
 }
 
 function splitByRuleAndFile<T extends { file: string }>(
@@ -109,21 +108,25 @@ function splitByRuleAndFile<T extends { file: string }>(
   rule: SuppressionRule,
   suppressions: Suppression[],
 ): SuppressionResult<T> {
-  const matching = suppressions.filter((s) => s.rule === rule);
-  if (matching.length === 0) return { remaining: violations, suppressed: [] };
-
+  const matchedIndices = new Set<number>();
   const remaining: T[] = [];
   const suppressed: T[] = [];
 
   for (const v of violations) {
-    if (matching.some((s) => matchesFile(v.file, s.file))) {
-      suppressed.push(v);
-    } else {
-      remaining.push(v);
+    let matched = false;
+    for (let i = 0; i < suppressions.length; i++) {
+      const s = suppressions[i];
+      if (s.rule !== rule) continue;
+      if (matchesFile(v.file, s.file)) {
+        matchedIndices.add(i);
+        matched = true;
+      }
     }
+    if (matched) suppressed.push(v);
+    else remaining.push(v);
   }
 
-  return { remaining, suppressed };
+  return { remaining, suppressed, matchedIndices };
 }
 
 export function applySuppressionsToLayerViolations(
@@ -144,21 +147,31 @@ export function applySuppressionsToStabilityViolations(
   violations: StabilityViolation[],
   suppressions: Suppression[],
 ): SuppressionResult<StabilityViolation> {
-  // StabilityViolation doesn't have `file` — match by files within edges
-  const matching = suppressions.filter((s) => s.rule === 'stabilityViolation' && s.file);
-  if (matching.length === 0) return { remaining: violations, suppressed: [] };
-
+  const matchedIndices = new Set<number>();
   const remaining: StabilityViolation[] = [];
   const suppressed: StabilityViolation[] = [];
+
   for (const v of violations) {
-    const anyMatch = v.files.some((f) =>
-      matching.some((s) => matchesFile(f.sourceFile, s.file) || matchesFile(f.targetFile, s.file)),
-    );
-    if (anyMatch) suppressed.push(v);
+    let matched = false;
+    for (let i = 0; i < suppressions.length; i++) {
+      const s = suppressions[i];
+      if (s.rule !== 'stabilityViolation' || !s.file) continue;
+      const anyEdgeMatches = v.files.some(
+        (f) => matchesFile(f.sourceFile, s.file) || matchesFile(f.targetFile, s.file),
+      );
+      if (anyEdgeMatches) {
+        matchedIndices.add(i);
+        matched = true;
+      }
+    }
+    if (matched) suppressed.push(v);
     else remaining.push(v);
   }
-  return { remaining, suppressed };
+
+  return { remaining, suppressed, matchedIndices };
 }
+
+// ─── SOLID suppressions (per-category) ──────────────────
 
 const SOLID_RULE_TO_CATEGORY: Record<string, (v: SolidViolation) => boolean> = {
   oversizedFile: (v) => v.principle === 'SRP' && v.message.includes('lines (threshold'),
@@ -166,7 +179,8 @@ const SOLID_RULE_TO_CATEGORY: Record<string, (v: SolidViolation) => boolean> = {
   duplication: (v) => v.principle === 'SRP' && v.message.toLowerCase().includes('duplicat'),
   deadExport: (v) => v.message.includes('Dead export'),
   dependencyInversion: (v) => v.principle === 'DIP',
-  interfaceSegregation: (v) => v.principle === 'ISP' && !v.message.includes('Shallow module') && !v.message.includes('God module'),
+  interfaceSegregation: (v) =>
+    v.principle === 'ISP' && !v.message.includes('Shallow module') && !v.message.includes('God module'),
   shallowModule: (v) => v.message.includes('Shallow module'),
   godModule: (v) => v.message.includes('God module'),
 };
@@ -174,31 +188,43 @@ const SOLID_RULE_TO_CATEGORY: Record<string, (v: SolidViolation) => boolean> = {
 export function applySuppressionsToSolidViolations(
   violations: SolidViolation[],
   suppressions: Suppression[],
-): { remaining: SolidViolation[]; suppressed: SolidViolation[]; countsByRule: Partial<SuppressionCounts> } {
+): {
+  remaining: SolidViolation[];
+  suppressed: SolidViolation[];
+  countsByRule: Record<string, number>;
+  matchedIndices: Set<number>;
+} {
   const remaining: SolidViolation[] = [];
   const suppressed: SolidViolation[] = [];
-  const countsByRule: Partial<SuppressionCounts> = {};
+  const countsByRule: Record<string, number> = {};
+  const matchedIndices = new Set<number>();
 
   for (const v of violations) {
-    let matched: SuppressionRule | null = null;
+    let matchedRule: SuppressionRule | null = null;
     for (const [rule, categoryTest] of Object.entries(SOLID_RULE_TO_CATEGORY)) {
       if (!categoryTest(v)) continue;
-      const fileSuppressions = suppressions.filter(
-        (s) => s.rule === rule && matchesFile(v.file, s.file),
-      );
-      if (fileSuppressions.length > 0) {
-        matched = rule as SuppressionRule;
+      let foundForThisRule = false;
+      for (let i = 0; i < suppressions.length; i++) {
+        const s = suppressions[i];
+        if (s.rule !== rule) continue;
+        if (matchesFile(v.file, s.file)) {
+          matchedIndices.add(i);
+          foundForThisRule = true;
+        }
+      }
+      if (foundForThisRule) {
+        matchedRule = rule as SuppressionRule;
         break;
       }
     }
 
-    if (matched) {
+    if (matchedRule) {
       suppressed.push(v);
-      countsByRule[matched] = (countsByRule[matched] ?? 0) + 1;
+      countsByRule[matchedRule] = (countsByRule[matchedRule] ?? 0) + 1;
     } else {
       remaining.push(v);
     }
   }
 
-  return { remaining, suppressed, countsByRule };
+  return { remaining, suppressed, countsByRule, matchedIndices };
 }

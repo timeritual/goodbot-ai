@@ -68,13 +68,7 @@ export const analyzeCommand = new Command('analyze')
       }
 
       renderHealthGrade(result.health);
-      if (result.suppressions && result.suppressions.total > 0) {
-        console.log();
-        log.dim(`  ${result.suppressions.total} violation${result.suppressions.total === 1 ? '' : 's'} suppressed via analysis.suppressions:`);
-        for (const [rule, count] of Object.entries(result.suppressions.byRule)) {
-          log.dim(`    ${String(count).padStart(4)}  ${rule}`);
-        }
-      }
+      renderSuppressionSummary(result.suppressions);
       renderDependencyAnalysis(result.dependency);
       renderSolidAnalysis(result.solid);
 
@@ -134,6 +128,32 @@ export function renderHealthGrade(health: HealthScore): void {
       const countStr = String(c.count).padStart(4);
       console.log(`    ${chalk.red(countStr)}  ${c.label}`);
     }
+  }
+}
+
+export function renderSuppressionSummary(
+  summary: FullAnalysis['suppressions'],
+): void {
+  if (!summary) return;
+
+  if (summary.total > 0) {
+    console.log();
+    log.dim(`  ${summary.total} violation${summary.total === 1 ? '' : 's'} suppressed via analysis.suppressions:`);
+    for (const [rule, count] of Object.entries(summary.byRule)) {
+      log.dim(`    ${String(count).padStart(4)}  ${rule}`);
+    }
+  }
+
+  if (summary.orphaned && summary.orphaned.length > 0) {
+    console.log();
+    const n = summary.orphaned.length;
+    log.warn(`${n} suppression${n === 1 ? '' : 's'} in .goodbot/config.json matched no violation — they are either stale, mistyped, or the violation has been fixed:`);
+    for (const o of summary.orphaned) {
+      const ident = o.cycle ? `cycle="${o.cycle}"` : o.file ? `file="${o.file}"` : '(no identifier)';
+      console.log(`  ${chalk.yellow('⚠')} #${o.index} ${chalk.cyan(o.rule)} ${ident}`);
+      console.log(chalk.dim(`     reason: ${o.reason}`));
+    }
+    log.dim('  Fix or remove these entries — they do NOT suppress anything today.');
   }
 }
 

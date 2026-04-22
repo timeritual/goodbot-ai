@@ -4,6 +4,7 @@ import {
   applySuppressionsToLayerViolations,
   applySuppressionsToBarrelViolations,
   applySuppressionsToSolidViolations,
+  parseCyclePattern,
   type Suppression,
 } from './suppressions.js';
 import type {
@@ -33,13 +34,24 @@ describe('applySuppressionsToCycles', () => {
     const result = applySuppressionsToCycles(cycles, suppressions);
     expect(result.remaining).toHaveLength(0);
     expect(result.suppressed).toHaveLength(1);
+    expect(result.matchedIndices.has(0)).toBe(true);
   });
 
-  it('matches regardless of arrow notation (→, ↔, comma, >)', () => {
+  it('matches regardless of arrow notation (→, ↔, ->, <->, comma, >)', () => {
     const cycles: CircularDependency[] = [
       { cycle: ['app', 'database', 'app'], files: [] },
     ];
-    for (const cycleStr of ['database → app', 'app → database', 'app ↔ database', 'app,database', 'app > database']) {
+    const patterns = [
+      'database → app',
+      'app → database',
+      'app ↔ database',
+      'app,database',
+      'app > database',
+      'app -> database',
+      'database -> app',
+      'app <-> database',
+    ];
+    for (const cycleStr of patterns) {
       const result = applySuppressionsToCycles(cycles, [
         { rule: 'circularDep', cycle: cycleStr, reason: 'test' },
       ]);
@@ -56,6 +68,56 @@ describe('applySuppressionsToCycles', () => {
     ]);
     expect(result.remaining).toHaveLength(1);
     expect(result.suppressed).toHaveLength(0);
+    expect(result.matchedIndices.size).toBe(0);
+  });
+
+  it('reports the index of the suppression entry that matched (so orphans can be detected)', () => {
+    const cycles: CircularDependency[] = [
+      { cycle: ['a', 'b', 'a'], files: [] },
+    ];
+    const suppressions: Suppression[] = [
+      { rule: 'circularDep', cycle: 'x → y', reason: 'no such cycle' },      // index 0 — orphan
+      { rule: 'circularDep', cycle: 'a ↔ b', reason: 'real' },               // index 1 — matches
+      { rule: 'circularDep', cycle: 'database → app', reason: 'no match' }, // index 2 — orphan
+    ];
+    const result = applySuppressionsToCycles(cycles, suppressions);
+    expect(result.matchedIndices.has(1)).toBe(true);
+    expect(result.matchedIndices.has(0)).toBe(false);
+    expect(result.matchedIndices.has(2)).toBe(false);
+  });
+});
+
+describe('parseCyclePattern', () => {
+  it('normalizes all separator formats to the same canonical form', () => {
+    const canonical = parseCyclePattern('a → b');
+    expect(parseCyclePattern('a ↔ b')).toBe(canonical);
+    expect(parseCyclePattern('a -> b')).toBe(canonical);
+    expect(parseCyclePattern('a <-> b')).toBe(canonical);
+    expect(parseCyclePattern('a, b')).toBe(canonical);
+    expect(parseCyclePattern('a > b')).toBe(canonical);
+    expect(parseCyclePattern('b → a')).toBe(canonical); // direction agnostic
+  });
+
+  it('handles multi-module cycles', () => {
+    expect(parseCyclePattern('a → b → c')).toBe(parseCyclePattern('c -> a -> b'));
+  });
+
+  it('trims whitespace', () => {
+    expect(parseCyclePattern('  a   →   b  ')).toBe(parseCyclePattern('a → b'));
+  });
+
+  it('canonical form emitted by `goodbot suppress` (a ↔ b) matches the same cycle in config', () => {
+    const emittedByCli = 'app ↔ database';
+    const typedByHumanAscii = 'app -> database';
+    const typedByHumanComma = 'database, app';
+    expect(parseCyclePattern(emittedByCli)).toBe(parseCyclePattern(typedByHumanAscii));
+    expect(parseCyclePattern(emittedByCli)).toBe(parseCyclePattern(typedByHumanComma));
+  });
+
+  it('accepts the human-natural "a -> b -> a" loop form (deduped)', () => {
+    // Users often type the cycle including the return-to-start
+    expect(parseCyclePattern('a -> b -> a')).toBe(parseCyclePattern('a -> b'));
+    expect(parseCyclePattern('database → app → database')).toBe(parseCyclePattern('app ↔ database'));
   });
 });
 

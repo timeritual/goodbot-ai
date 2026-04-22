@@ -69,6 +69,16 @@ export const generateCommand = new Command('generate')
             log.dim(`    ${String(c.count).padStart(4)}  ${c.label}`);
           }
         }
+        const orphans = fullAnalysis.suppressions?.orphaned ?? [];
+        if (orphans.length > 0) {
+          console.log();
+          log.warn(`${orphans.length} suppression${orphans.length === 1 ? '' : 's'} matched no violation:`);
+          for (const o of orphans) {
+            const ident = o.cycle ? `cycle="${o.cycle}"` : o.file ? `file="${o.file}"` : '(no identifier)';
+            console.log(`    ${chalk.yellow('⚠')} #${o.index} ${chalk.cyan(o.rule)} ${ident}`);
+          }
+          log.dim('  These entries do NOT suppress anything. Fix or remove in .goodbot/config.json. Run `goodbot analyze` for details.');
+        }
       } catch (err) {
         analyzeSpinner.warn('Analysis failed — generating without analysis data');
         log.dim(`  ${err instanceof Error ? err.message : String(err)}`);

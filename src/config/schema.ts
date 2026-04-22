@@ -94,6 +94,44 @@ export const GoodbotConfigSchema = z.object({
       shallowModules: z.array(z.string()).optional(),
       godModules: z.array(z.string()).optional(),
     }).default({}),
+    // Per-violation suppressions (ESLint-disable for architecture). Unlike
+    // `ignore` (which is glob-based and removes violations from all counts),
+    // suppressions target a single specific violation (by rule + file, or
+    // rule + cycle). Suppressed violations still appear with "(N suppressed)"
+    // in analyze output — they don't contribute to the health grade but are
+    // visible in audits.
+    //
+    // `rule` values:
+    //   circularDep        — identify by `cycle` (e.g., "database → app")
+    //   layerViolation     — identify by `file` (the importing file)
+    //   barrelViolation    — identify by `file`
+    //   oversizedFile      — identify by `file`
+    //   complexity         — identify by `file`
+    //   duplication        — identify by `file`
+    //   deadExport         — identify by `file` (the module directory)
+    //   dependencyInversion — identify by `file`
+    //   interfaceSegregation — identify by `file`
+    //   shallowModule      — identify by `file`
+    //   godModule          — identify by `file`
+    suppressions: z.array(z.object({
+      rule: z.enum([
+        'circularDep',
+        'layerViolation',
+        'barrelViolation',
+        'stabilityViolation',
+        'oversizedFile',
+        'complexity',
+        'duplication',
+        'deadExport',
+        'dependencyInversion',
+        'interfaceSegregation',
+        'shallowModule',
+        'godModule',
+      ]),
+      file: z.string().optional(),
+      cycle: z.string().optional(),
+      reason: z.string(),
+    })).default([]),
   }).default({}),
   customRulesConfig: z.array(z.object({
     name: z.string(),
@@ -108,13 +146,16 @@ export const GoodbotConfigSchema = z.object({
     syncUrl: z.string().optional(),
     name: z.string().optional(),
   }).default({}),
+  // Paths excluded from `.cursorignore` output. This field does NOT affect
+  // the dependency analysis — use `analysis.ignore.*` to suppress specific
+  // checks, or `.goodbot/ignore` to exclude files from all violations.
   ignore: z.object({
     paths: z.array(z.string()).default([
       'node_modules', 'dist', 'build', '.next', 'coverage', '*.lock',
-    ]),
+    ]).describe('Paths listed in generated .cursorignore (does NOT affect analysis)'),
     sensitiveFiles: z.array(z.string()).default([
       '.env', '.env.*', 'credentials.json', '*.pem', '*.key',
-    ]),
+    ]).describe('Sensitive files listed in generated .cursorignore (does NOT affect analysis)'),
   }).default({}),
 });
 

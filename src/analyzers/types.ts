@@ -70,6 +70,12 @@ export interface BarrelViolation {
   targetRole?: string;
 }
 
+/** Counts of violations that were suppressed (by `analysis.suppressions` rules) */
+export interface SuppressionSummary {
+  total: number;
+  byRule: Record<string, number>;
+}
+
 /** A layer ordering violation */
 export interface LayerViolation {
   file: string;
@@ -166,6 +172,7 @@ export interface FullAnalysis {
   dependency: DependencyAnalysis;
   solid: SolidAnalysis;
   health: HealthScore;
+  suppressions?: SuppressionSummary;
 }
 
 /** Lightweight summary for generator context */

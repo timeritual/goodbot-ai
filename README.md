@@ -94,6 +94,12 @@ goodbot init && goodbot generate
 
 ## What's new
 
+### 0.8
+- **`init` preserves customizations on re-run** — running `goodbot init --preset recommended` a second time no longer clobbers your hand-edited `verification.typecheck`, custom rules, suppressions, or thresholds. Only scan-detected fields (framework, layers, systemType) are refreshed. Pass `--force` to explicitly overwrite with preset defaults. Shows a diff of what changed.
+- **Per-rule suppressions** — add `analysis.suppressions` entries to accept specific violations intentionally (e.g., a migration script legitimately importing from services). Each suppression requires a `reason`. Suppressed violations appear as `(N suppressed)` in `analyze` output and don't contribute to the health grade — but they're still visible in audits.
+- **Next-step prompts** — after `init` and `generate` succeed, the CLI surfaces the highest-value next actions (install git hooks, check freshness, add to CI) instead of a single-line "Run goodbot check" hint.
+- **`ignore.paths` clarified** — schema now has an explicit description that it only affects `.cursorignore` output, not dependency analysis. See the "Managing Violations" decision tree in the README for which knob to use.
+
 ### 0.7
 - **Analysis-scoped ignores** — suppress specific checks (e.g., circular dependencies) for known false-positive patterns without excluding files from other checks. TypeORM/Mongoose entity cycles get sensible out-of-the-box defaults for API projects. New `--no-ignore` flag on `goodbot analyze` for audits.
 
@@ -151,7 +157,9 @@ goodbot init --preset recommended --dry-run
 | `--preset <name>` | Non-interactive setup with `strict`, `recommended`, or `relaxed` preset |
 | `--on-conflict <strategy>` | How generate should handle existing agent files: `merge` (default), `overwrite`, or `skip` |
 | `--dry-run` | Preview preset config without writing (requires `--preset`) |
-| `--force` | Overwrite existing `.goodbot/config.json` without prompting |
+| `--force` | Overwrite existing `.goodbot/config.json` completely — bypasses merge mode |
+
+**Re-init is safe by default.** Running `goodbot init` on an existing project merges the preset into your existing config — refreshing only scan-detected fields (framework, layers, systemType, format/build commands) and preserving everything you've hand-edited (verification commands with custom flags, custom rules, business logic, thresholds, budgets, ignores, suppressions). A diff of what changed prints before the save. Pass `--force` to do a full overwrite with preset defaults.
 
 Saves everything to `.goodbot/config.json` — your single source of truth. Also creates `.goodbot/.gitignore` to keep local state files out of version control.
 
@@ -674,6 +682,52 @@ These rules target the specific ways AI-generated code degrades a codebase over 
 
 ## Managing Violations
 
+There are four knobs for dealing with architectural violations. Pick based on intent:
+
+| Knob | Scope | When to use |
+|------|-------|-------------|
+| `analysis.suppressions` | Exact file/cycle + rule + **required reason** | You accept this specific violation intentionally (migration script, intentional exception). Shows as `(N suppressed)` in output. |
+| `analysis.ignore.*` | Glob pattern per check category | Well-known false positives — TypeORM entity cycles, generated code. Doesn't appear in output at all. |
+| `.goodbot/ignore` | File paths → all checks | Legacy / vendored / generated code you never want analyzed. Files still contribute to `filesParsed`. |
+| Violation budgets | Per-category threshold | Known debt you want visible but not failing CI until it grows past a limit. |
+
+**Important:** `ignore.paths` in config does NOT affect analysis — it only populates `.cursorignore` so Cursor skips those paths. Use `analysis.ignore.*` or `.goodbot/ignore` if you want to affect analysis.
+
+### `analysis.suppressions` (per-violation, with reasons)
+
+ESLint-disable for architecture. Accept a specific violation by `rule + file` (or `rule + cycle`), with a mandatory `reason` string:
+
+```jsonc
+// .goodbot/config.json
+{
+  "analysis": {
+    "suppressions": [
+      {
+        "rule": "layerViolation",
+        "file": "src/scripts/migrate.ts",
+        "reason": "Migration scripts legitimately import from services"
+      },
+      {
+        "rule": "circularDep",
+        "cycle": "database → app",
+        "reason": "Bootstrap wiring — DB module depends on app.module for feature imports"
+      },
+      {
+        "rule": "oversizedFile",
+        "file": "src/generated/schema.ts",
+        "reason": "Auto-generated from GraphQL schema"
+      }
+    ]
+  }
+}
+```
+
+Valid `rule` values: `circularDep`, `layerViolation`, `barrelViolation`, `stabilityViolation`, `oversizedFile`, `complexity`, `duplication`, `deadExport`, `dependencyInversion`, `interfaceSegregation`, `shallowModule`, `godModule`.
+
+For `circularDep`, identify the cycle by a `cycle` field (e.g. `"database → app"` — directions don't matter, both orderings match). For everything else, identify by `file` (exact or trailing path).
+
+Suppressed violations show as `(N suppressed)` in `analyze` output and don't contribute to the health grade. Use `goodbot analyze --no-ignore` to see them anyway for audits.
+
 ### `.goodbot/ignore` (legacy, file-level)
 
 Suppress all violations in specific files or entire directories — useful for opting out of the whole analysis on a path:
@@ -740,12 +794,6 @@ Audit mode: pass `--no-ignore` to `goodbot analyze` to bypass all analysis-scope
 **Accept known debt** with [violation budgets](#violation-budgets) — acknowledge violations without hiding them, and fail only when the count exceeds the budget.
 
 ---
-
-### Which should I use?
-
-- `.goodbot/ignore` → entire files/directories you don't want analyzed at all (legacy, vendored code, generated test fixtures).
-- `analysis.ignore` → well-known false positives in an otherwise healthy area of the codebase (ORM entity cycles, generated-code complexity).
-- **Violation budgets** → known debt you want visible in reports but not failing CI until it grows past a threshold.
 
 ---
 

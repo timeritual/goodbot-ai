@@ -25,6 +25,13 @@ import {
   filterStabilityViolationsByFile,
   filterSolidViolationsByCategory,
 } from './analysis-ignore.js';
+import {
+  applySuppressionsToCycles,
+  applySuppressionsToLayerViolations,
+  applySuppressionsToBarrelViolations,
+  applySuppressionsToStabilityViolations,
+  applySuppressionsToSolidViolations,
+} from './suppressions.js';
 import { checkCustomRules } from './custom-rules.js';
 
 export type { DependencyAnalysis, DependencyAnalysisSummary, FullAnalysis, SolidAnalysis, HealthScore, HealthGrade, BarrelViolation } from './types.js';
@@ -239,13 +246,46 @@ export async function runFullAnalysis(
     solid.violations = filterSolidViolationsByCategory(solid.violations, scopedIgnore);
   }
 
-  // Health score
+  // Apply per-violation suppressions. These are tracked separately so we can
+  // report "(N suppressed)" in the analyze output.
+  const suppressions = config?.analysis.suppressions ?? [];
+  let suppressionSummary: FullAnalysis['suppressions'];
+  if (suppressions.length > 0 && !options.noIgnore) {
+    const byRule: Record<string, number> = {};
+
+    const cycleResult = applySuppressionsToCycles(dep.circularDependencies, suppressions);
+    dep.circularDependencies = cycleResult.remaining;
+    if (cycleResult.suppressed.length > 0) byRule.circularDep = cycleResult.suppressed.length;
+
+    const layerResult = applySuppressionsToLayerViolations(dep.layerViolations, suppressions);
+    dep.layerViolations = layerResult.remaining;
+    if (layerResult.suppressed.length > 0) byRule.layerViolation = layerResult.suppressed.length;
+
+    const barrelResult = applySuppressionsToBarrelViolations(dep.barrelViolations, suppressions);
+    dep.barrelViolations = barrelResult.remaining;
+    if (barrelResult.suppressed.length > 0) byRule.barrelViolation = barrelResult.suppressed.length;
+
+    const stabilityResult = applySuppressionsToStabilityViolations(dep.stabilityViolations, suppressions);
+    dep.stabilityViolations = stabilityResult.remaining;
+    if (stabilityResult.suppressed.length > 0) byRule.stabilityViolation = stabilityResult.suppressed.length;
+
+    const solidResult = applySuppressionsToSolidViolations(solid.violations, suppressions);
+    solid.violations = solidResult.remaining;
+    for (const [rule, count] of Object.entries(solidResult.countsByRule)) {
+      if (count) byRule[rule] = (byRule[rule] ?? 0) + count;
+    }
+
+    const total = Object.values(byRule).reduce((a, b) => a + b, 0);
+    if (total > 0) suppressionSummary = { total, byRule };
+  }
+
+  // Health score (calculated AFTER ignores + suppressions)
   const health = calculateHealthScore(dep, solid);
 
   // Update timing to include SOLID
   dep.timeTakenMs = Date.now() - startTime;
 
-  return { dependency: dep, solid, health };
+  return { dependency: dep, solid, health, suppressions: suppressionSummary };
 }
 
 function emptyAnalysis(timeTakenMs: number): DependencyAnalysis {

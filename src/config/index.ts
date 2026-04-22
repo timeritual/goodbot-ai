@@ -5,6 +5,7 @@ import { GoodbotConfigSchema, type GoodbotConfig } from './schema.js';
 export { GoodbotConfigSchema, type GoodbotConfig, type ArchitectureLayer } from './schema.js';
 export { frameworkDefaults } from './defaults.js';
 export { buildPresetConfig, defaultAnalysisIgnore, PRESET_DESCRIPTIONS, type PresetName } from './presets.js';
+export { mergeConfigWithPreset, diffConfigs, type ConfigChange } from './merge.js';
 
 const CONFIG_DIR = '.goodbot';
 const CONFIG_FILE = 'config.json';

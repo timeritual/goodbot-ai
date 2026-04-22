@@ -68,6 +68,13 @@ export const analyzeCommand = new Command('analyze')
       }
 
       renderHealthGrade(result.health);
+      if (result.suppressions && result.suppressions.total > 0) {
+        console.log();
+        log.dim(`  ${result.suppressions.total} violation${result.suppressions.total === 1 ? '' : 's'} suppressed via analysis.suppressions:`);
+        for (const [rule, count] of Object.entries(result.suppressions.byRule)) {
+          log.dim(`    ${String(count).padStart(4)}  ${rule}`);
+        }
+      }
       renderDependencyAnalysis(result.dependency);
       renderSolidAnalysis(result.solid);
 

@@ -4,10 +4,13 @@ import ora from 'ora';
 import { runFullScan } from '../scanners/index.js';
 import {
   saveConfig,
+  loadConfig,
   configExists,
   frameworkDefaults,
   buildPresetConfig,
   defaultAnalysisIgnore,
+  mergeConfigWithPreset,
+  diffConfigs,
   PRESET_DESCRIPTIONS,
   type GoodbotConfig,
   type PresetName,
@@ -34,21 +37,29 @@ export const initCommand = new Command('init')
   .action(async (opts) => {
     const projectRoot = opts.path;
     const isPreset = !!opts.preset;
+    const configAlreadyExists = await configExists(projectRoot);
 
-    // Preset mode: skip all interactive prompts (safe for CI / non-TTY)
-    if (!isPreset && !opts.force && (await configExists(projectRoot))) {
-      const { overwrite } = await inquirer.prompt([
+    // If config exists and user didn't pass --force, we merge preset into existing config
+    // (preserving user customizations). Interactive mode confirms.
+    if (configAlreadyExists && !opts.force && !isPreset) {
+      const { action } = await inquirer.prompt([
         {
-          type: 'confirm',
-          name: 'overwrite',
-          message: '.goodbot/config.json already exists. Overwrite?',
-          default: false,
+          type: 'list',
+          name: 'action',
+          message: '.goodbot/config.json already exists. What do you want to do?',
+          choices: [
+            { name: 'Merge — refresh detected fields, preserve my customizations', value: 'merge' },
+            { name: 'Overwrite — replace everything (loses custom verification commands, rules, etc.)', value: 'overwrite' },
+            { name: 'Cancel', value: 'cancel' },
+          ],
+          default: 'merge',
         },
       ]);
-      if (!overwrite) {
+      if (action === 'cancel') {
         log.info('Cancelled.');
         return;
       }
+      if (action === 'overwrite') opts.force = true;
     }
 
     // Phase 1: Auto-scan
@@ -101,8 +112,33 @@ export const initCommand = new Command('init')
         process.exit(1);
       }
 
-      const config = buildPresetConfig(preset, scan);
+      let config = buildPresetConfig(preset, scan);
       config.agentFiles.existingFileStrategy = existingFileStrategy;
+
+      // If an existing config is present, merge the preset into it (preserving user customizations).
+      // --force bypasses the merge and overwrites with the raw preset.
+      if (configAlreadyExists && !opts.force) {
+        try {
+          const existing = await loadConfig(projectRoot);
+          const merged = mergeConfigWithPreset(existing, config);
+          // Preserve user's existingFileStrategy unless they passed --on-conflict explicitly
+          if (!opts.onConflict) {
+            merged.agentFiles.existingFileStrategy = existing.agentFiles.existingFileStrategy;
+          }
+          const changes = diffConfigs(existing, merged);
+          config = merged;
+          if (changes.length > 0) {
+            log.info(`Merging "${preset}" preset into existing config (preserving your customizations). ${changes.length} detected-field${changes.length === 1 ? '' : 's'} refreshed:`);
+            for (const c of changes) {
+              console.log(`  ${c.path}: ${c.from} → ${c.to}`);
+            }
+          } else {
+            log.dim('Existing config already matches current scan — no changes needed.');
+          }
+        } catch (err) {
+          log.warn(`Could not load existing config for merge — falling back to preset defaults. (${err instanceof Error ? err.message : String(err)})`);
+        }
+      }
 
       if (opts.dryRun) {
         log.info(`Preview of "${preset}" preset for ${config.project.name}:`);
@@ -127,9 +163,11 @@ export const initCommand = new Command('init')
 
       await saveConfig(projectRoot, config);
       await ensureGoodbotGitignore(projectRoot);
-      log.success(`Config saved with "${preset}" preset to .goodbot/config.json`);
+      log.success(configAlreadyExists && !opts.force
+        ? `Config updated at .goodbot/config.json (your customizations preserved)`
+        : `Config saved with "${preset}" preset to .goodbot/config.json`);
       log.dim(PRESET_DESCRIPTIONS[preset]);
-      log.dim('Run `goodbot generate` to create your agent files.');
+      printNextSteps();
       return;
     }
 
@@ -370,6 +408,7 @@ export const initCommand = new Command('init')
         thresholds: { maxFileLines: 300, maxBarrelExports: 15, maxModuleCoupling: 8 },
         budget: {},
         ignore: defaultAnalysisIgnore(framework),
+        suppressions: [],
       },
       customRulesConfig: [],
       team: {},
@@ -379,11 +418,35 @@ export const initCommand = new Command('init')
       },
     };
 
-    await saveConfig(projectRoot, config);
+    // If an existing config is present and user chose "merge" at the top, apply
+    // the merge rules (preserve customizations). --force (or they chose overwrite)
+    // skips this branch.
+    let finalConfig = config;
+    if (configAlreadyExists && !opts.force) {
+      try {
+        const existing = await loadConfig(projectRoot);
+        finalConfig = mergeConfigWithPreset(existing, config);
+        // Respect the existingFileStrategy they just picked, not the stored one
+        finalConfig.agentFiles.existingFileStrategy = existingFileStrategy;
+        const changes = diffConfigs(existing, finalConfig);
+        if (changes.length > 0) {
+          log.info(`${changes.length} detected-field${changes.length === 1 ? '' : 's'} refreshed (customizations preserved):`);
+          for (const c of changes) {
+            console.log(`  ${c.path}: ${c.from} → ${c.to}`);
+          }
+        }
+      } catch (err) {
+        log.warn(`Could not load existing config for merge — saving fresh config instead. (${err instanceof Error ? err.message : String(err)})`);
+      }
+    }
+
+    await saveConfig(projectRoot, finalConfig);
     await ensureGoodbotGitignore(projectRoot);
 
-    log.success('Config saved to .goodbot/config.json');
-    log.dim('Run `goodbot generate` to create your agent files.');
+    log.success(configAlreadyExists && !opts.force
+      ? 'Config updated at .goodbot/config.json (your customizations preserved)'
+      : 'Config saved to .goodbot/config.json');
+    printNextSteps();
   });
 
 async function ensureGoodbotGitignore(projectRoot: string): Promise<void> {
@@ -396,4 +459,13 @@ checksums.json
 history.json
 `;
   await safeWriteFile(gitignorePath, content);
+}
+
+function printNextSteps(): void {
+  console.log();
+  log.dim('Next steps:');
+  console.log('  1. Generate guardrails:  npx goodbot-ai generate');
+  console.log('  2. Install git hooks:    npx goodbot-ai hooks install');
+  console.log('  3. Check freshness:      npx goodbot-ai freshness');
+  console.log('  4. Add to CI:            npx goodbot-ai check');
 }

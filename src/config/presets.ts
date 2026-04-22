@@ -89,6 +89,7 @@ export function buildPresetConfig(
       thresholds: { maxFileLines: 300, maxBarrelExports: 15, maxModuleCoupling: 8 },
       budget: {},
       ignore: defaultAnalysisIgnore(scan.framework.framework),
+      suppressions: [],
     },
     customRulesConfig: [],
     team: {},

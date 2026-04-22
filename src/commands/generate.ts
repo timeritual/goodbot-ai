@@ -171,7 +171,10 @@ export const generateCommand = new Command('generate')
         }
 
         console.log();
-        log.dim('Run `goodbot check` to verify files stay in sync.');
+        log.dim('Next steps:');
+        console.log('  • Install git hooks:  npx goodbot-ai hooks install');
+        console.log('  • Track freshness:    npx goodbot-ai freshness');
+        console.log('  • Add to CI:          npx goodbot-ai check');
       }
     } catch (err) {
       spinner.fail('Generation failed');

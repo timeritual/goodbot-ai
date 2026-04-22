@@ -17,14 +17,14 @@ import { onboardCommand } from './commands/onboard.js';
 import { freshnessCommand } from './commands/freshness.js';
 import { hooksCommand } from './commands/hooks.js';
 import { presetsCommand } from './commands/presets.js';
-import { suppressCommand } from './commands/suppress.js';
+import { suppressCommand, unsuppressCommand } from './commands/suppress.js';
 
 const program = new Command();
 
 program
   .name('goodbot')
   .description('Auto-generate AI agent guardrail files for your project')
-  .version('0.10.0');
+  .version('0.11.0');
 
 program.addCommand(scanCommand);
 program.addCommand(initCommand);
@@ -45,5 +45,6 @@ program.addCommand(reportCommand);
 program.addCommand(onboardCommand);
 program.addCommand(presetsCommand);
 program.addCommand(suppressCommand);
+program.addCommand(unsuppressCommand);
 
 program.parse();

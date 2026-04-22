@@ -52,9 +52,18 @@ export const suppressCommand = new Command('suppress')
       process.exit(1);
     }
 
-    const reason = opts.reason ?? '';
-    if (!reason) {
-      log.warn(`No --reason provided. Suppressions require a reason. Example:`);
+    const reason = (opts.reason ?? '').trim();
+
+    // --apply requires a real reason. No TODO placeholders reach main.
+    if (opts.apply) {
+      const reasonError = validateReason(reason);
+      if (reasonError) {
+        log.error(reasonError);
+        console.log(`  goodbot suppress ${id} --reason "Migration scripts legitimately use services" --apply`);
+        process.exit(1);
+      }
+    } else if (!reason) {
+      log.warn('No --reason provided. Suppressions require a reason. Example:');
       console.log(`  goodbot suppress ${id} --reason "Migration scripts legitimately use services"`);
       console.log();
     }
@@ -80,18 +89,101 @@ export const suppressCommand = new Command('suppress')
       config.analysis.suppressions = [...existing, entry];
       await saveConfig(projectRoot, config);
       log.success(`Added suppression to .goodbot/config.json (${match.label})`);
-      if (!reason) {
-        log.warn('Remember to update the reason field — the default placeholder will not help your future teammate.');
-      }
     } else {
       console.log();
       log.dim('Add this to .goodbot/config.json under analysis.suppressions:');
       console.log();
       console.log(JSON.stringify(entry, null, 2));
       console.log();
-      log.dim('Or run with --apply to append it for you.');
+      log.dim('Or run with --apply to append it for you (requires --reason).');
     }
   });
+
+// ─── unsuppress command (removes a suppression by id) ───
+
+export const unsuppressCommand = new Command('unsuppress')
+  .description('Remove a suppression from analysis.suppressions by its content-based id')
+  .argument('<id>', 'The same id format emitted by `goodbot suppress` (e.g. cycle-app-database)')
+  .option('-p, --path <path>', 'Project path', process.cwd())
+  .action(async (id: string, opts) => {
+    const projectRoot = opts.path;
+
+    let config;
+    try {
+      config = await loadConfig(projectRoot);
+    } catch (err) {
+      log.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+
+    const existing = config.analysis.suppressions ?? [];
+    if (existing.length === 0) {
+      log.info('No suppressions to remove — .goodbot/config.json has none.');
+      return;
+    }
+
+    // Match the provided ID against each suppression's synthesized ID.
+    // This is the reverse lookup: given a suppression in config, what ID would
+    // `goodbot suppress` emit for it today?
+    const targetIndex = existing.findIndex((s) => suppressionMatchesId(s, id));
+    if (targetIndex === -1) {
+      log.error(`No suppression in config matches id "${id}".`);
+      log.dim('Run `goodbot suppress` (no args) to see current ids, or open .goodbot/config.json to inspect existing suppressions.');
+      process.exit(1);
+    }
+
+    const removed = existing[targetIndex];
+    const remaining = [...existing.slice(0, targetIndex), ...existing.slice(targetIndex + 1)];
+    config.analysis.suppressions = remaining;
+    await saveConfig(projectRoot, config);
+
+    const label = removed.cycle ? `cycle="${removed.cycle}"` : removed.file ? `file="${removed.file}"` : '(no identifier)';
+    log.success(`Removed suppression: ${removed.rule} ${label}`);
+    log.dim(`  reason was: ${removed.reason}`);
+  });
+
+/**
+ * Check whether an existing suppression config entry would have the given
+ * content-based ID. Works for both file-based and cycle-based suppressions.
+ */
+export function suppressionMatchesId(suppression: { rule: SuppressionRule; file?: string; cycle?: string }, id: string): boolean {
+  const prefix = RULE_PREFIX[suppression.rule];
+
+  if (suppression.cycle) {
+    // Cycle IDs are content-based on sorted, deduped module names.
+    const modules = suppression.cycle
+      .split(/\s*(?:→|↔|<->|->|<-|>|,)\s*/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const unique = Array.from(new Set(modules)).sort();
+    const expected = `${prefix}-${unique.map(slugify).join('-')}`;
+    return expected === id;
+  }
+
+  if (suppression.file) {
+    const expected = `${prefix}-${slugify(suppression.file)}`;
+    return expected === id;
+  }
+
+  return false;
+}
+
+/**
+ * Ensure the reason attached to a suppression is useful. Empty strings and
+ * literal TODO placeholders are rejected so nothing useless reaches main.
+ */
+export function validateReason(reason: string): string | null {
+  if (!reason) {
+    return '--apply requires --reason. Suppressions must be documented with a real justification.';
+  }
+  if (/^\s*TODO\b/i.test(reason)) {
+    return '`--reason` looks like a placeholder ("TODO..."). Provide the real justification.';
+  }
+  if (reason.length < 8) {
+    return '`--reason` is too short. Provide a real justification (min 8 characters).';
+  }
+  return null;
+}
 
 // ─── ID generation ──────────────────────────────────────
 

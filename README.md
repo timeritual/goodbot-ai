@@ -190,7 +190,8 @@ Plus internal state in `.goodbot/`:
 | `goodbot analyze` | Full architectural audit — dependency graph, SOLID, layer violations, health grade. |
 | `goodbot diff` | Show violations introduced by the current branch (vs base). Great for PR review. |
 | `goodbot hooks install` | Install git hooks that warn on stale guardrails. |
-| `goodbot suppress` | List detected violations with IDs; emit paste-ready suppression JSON. `--apply` writes to config. |
+| `goodbot suppress` | List detected violations with content-based IDs; emit paste-ready suppression JSON. `--apply --reason "..."` writes to config. |
+| `goodbot unsuppress <id>` | Remove a suppression from `analysis.suppressions` by its content-based ID. |
 | `goodbot score` | One-line health grade. Fast enough for pre-commit hooks. |
 | `goodbot presets` | Side-by-side comparison of the strict/recommended/relaxed presets. |
 
@@ -269,11 +270,22 @@ $ goodbot suppress
 
 $ goodbot suppress cycle-app-database --reason "Bootstrap wiring" --apply
 ✓ Added suppression to .goodbot/config.json
+
+$ goodbot unsuppress cycle-app-database
+✓ Removed suppression: circularDep cycle="database ↔ app"
 ```
+
+`--apply` requires a real `--reason` (min 8 chars, no literal `TODO:` placeholders) so nothing undocumented reaches main.
 
 Goodbot also warns loudly on every `analyze`/`generate` about any suppression that matches no detected violation — so typos / stale entries can't silently disable guardrails. If a CI script references `cycle-app-database` and the cycle is fixed, the next run errors clearly ("No violation with that id") instead of silently suppressing the wrong thing.
 
 ---
+
+## What's new in 0.11
+
+- **`goodbot unsuppress <id>` closes the loop.** Adding a suppression was one command; removing one required hand-editing JSON. Now both use the same content-based IDs — `goodbot unsuppress cycle-app-database` removes the matching entry cleanly.
+- **`--apply` requires a real `--reason`.** Empty, literal `TODO:` placeholders, and too-short (<8 chars) reasons are rejected before writing to config. No more "TODO: explain why..." placeholders reaching main.
+- **Husky v9 hooks install fix.** `goodbot hooks install` now correctly installs into `.husky/` (user-facing) when husky v9 is detected, instead of `.husky/_/` (husky's internal regenerated dir). Previously goodbot's hooks were wiped silently on the next `npm install`.
 
 ## What's new in 0.10
 

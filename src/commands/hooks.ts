@@ -93,9 +93,22 @@ function getHooksDir(projectRoot: string): string | null {
       encoding: 'utf-8',
     }).trim();
     if (customPath) {
-      return path.isAbsolute(customPath)
+      const resolved = path.isAbsolute(customPath)
         ? customPath
         : path.join(projectRoot, customPath);
+
+      // Husky v9 sets core.hooksPath to `.husky/_`, but `.husky/_` is
+      // husky's internal managed directory — files there are regenerated
+      // on every `husky install` / `npm install --prepare`. Installing
+      // there means goodbot's hooks get wiped silently.
+      //
+      // Husky's user-facing hooks live in the PARENT (`.husky/`).
+      // Detect this case and install into the parent instead, so our
+      // changes survive husky reinstalls.
+      if (resolved.endsWith(`${path.sep}_`) || resolved === '_') {
+        return path.dirname(resolved);
+      }
+      return resolved;
     }
   } catch {
     // No custom hooks path

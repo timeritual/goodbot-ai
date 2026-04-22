@@ -111,7 +111,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: npx goodbot-ai check           # drift in generated files
+      - run: npx goodbot-ai check --strict  # drift + stale suppressions
       - run: npx goodbot-ai freshness       # health claims still accurate?
       - run: npx goodbot-ai diff --freshness # did THIS PR move the grade?
 ```
@@ -185,7 +185,7 @@ Plus internal state in `.goodbot/`:
 |---------|--------------|
 | `goodbot init` | Set up `.goodbot/config.json`. Merges into existing config by default (preserves customizations); `--force` overwrites. |
 | `goodbot generate` | Write/refresh the guardrail files. Safe to re-run — preserves user content via markers. |
-| `goodbot check` | Verify generated files haven't drifted. CI-friendly (exit 1 on drift). |
+| `goodbot check` | Verify generated files haven't drifted. `--strict` also fails on stale suppressions. CI-friendly (exit 1). |
 | `goodbot freshness` | Compare snapshot claims to current reality. Tells you what's stale. |
 | `goodbot analyze` | Full architectural audit — dependency graph, SOLID, layer violations, health grade. |
 | `goodbot diff` | Show violations introduced by the current branch (vs base). Great for PR review. |
@@ -280,6 +280,10 @@ $ goodbot unsuppress cycle-app-database
 Goodbot also warns loudly on every `analyze`/`generate` about any suppression that matches no detected violation — so typos / stale entries can't silently disable guardrails. If a CI script references `cycle-app-database` and the cycle is fixed, the next run errors clearly ("No violation with that id") instead of silently suppressing the wrong thing.
 
 ---
+
+## What's new in 0.12
+
+- **`goodbot check --strict` for CI enforcement.** Orphaned suppressions (entries that no longer match any detected violation) previously only printed a warning — CI wouldn't catch them. Now `goodbot check --strict` runs the analysis, verifies every suppression still targets a real violation, and exits 1 if any are orphaned. Add it to your CI pipeline so stale suppressions can't silently reach `main`.
 
 ## What's new in 0.11
 

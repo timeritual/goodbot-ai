@@ -4,11 +4,14 @@ import chalk from 'chalk';
 import { loadConfig, loadChecksums } from '../config/index.js';
 import { FILE_MAP } from '../generators/index.js';
 import { loadSnapshot } from '../freshness/index.js';
+import { runFullScan } from '../scanners/index.js';
+import { runFullAnalysis } from '../analyzers/index.js';
 import { log, safeReadFile, contentHash, fileExists } from '../utils/index.js';
 
 export const checkCommand = new Command('check')
   .description('Check if generated files are in sync with your config')
   .option('-p, --path <path>', 'Project path', process.cwd())
+  .option('--strict', 'Also fail if any analysis.suppressions entry is orphaned (matches no detected violation)', false)
   .action(async (opts) => {
     const projectRoot = opts.path;
 
@@ -77,6 +80,30 @@ export const checkCommand = new Command('check')
       }
     } else {
       console.log(`  ${'Snapshot'.padEnd(28)} ${chalk.dim('none (run generate --analyze for freshness tracking)')}`);
+    }
+
+    // --strict: verify every analysis.suppressions entry still matches a real
+    // violation. Orphans silently disable guardrails, so CI should catch them.
+    if (opts.strict) {
+      const suppressions = config.analysis.suppressions ?? [];
+      if (suppressions.length > 0) {
+        console.log();
+        const scan = await runFullScan(projectRoot);
+        const result = await runFullAnalysis(projectRoot, scan.structure, config);
+        const orphans = result.suppressions?.orphaned ?? [];
+        if (orphans.length > 0) {
+          log.warn(`${orphans.length} suppression${orphans.length === 1 ? '' : 's'} matched no violation:`);
+          for (const o of orphans) {
+            const ident = o.cycle ? `cycle="${o.cycle}"` : o.file ? `file="${o.file}"` : '(no identifier)';
+            console.log(`    ${chalk.yellow('⚠')} #${o.index} ${chalk.cyan(o.rule)} ${ident}`);
+            console.log(chalk.dim(`       reason: ${o.reason}`));
+          }
+          log.dim('  Remove with `goodbot unsuppress <id>` or fix the identifier in .goodbot/config.json.');
+          issues += orphans.length;
+        } else {
+          console.log(`  ${'Suppressions'.padEnd(28)} ${chalk.green(`✓ all ${suppressions.length} match real violations`)}`);
+        }
+      }
     }
 
     console.log();

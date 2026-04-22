@@ -17,6 +17,7 @@ export const analyzeCommand = new Command('analyze')
   .option('--json', 'Output as JSON', false)
   .option('--diagram', 'Generate architecture.md with mermaid dependency diagram', false)
   .option('--git', 'Include git history analysis (hotspots, AI commits, temporal coupling)', false)
+  .option('--no-ignore', 'Bypass analysis.ignore rules in config (audit mode)')
   .action(async (opts) => {
     const projectRoot = opts.path;
     const spinner = ora('Scanning project...').start();
@@ -32,7 +33,9 @@ export const analyzeCommand = new Command('analyze')
         // No config — use scan results only
       }
 
-      const result = await runFullAnalysis(projectRoot, scan.structure, config);
+      // Commander sets opts.ignore=false when --no-ignore is passed; treat anything else as "use ignores".
+      const noIgnore = opts.ignore === false;
+      const result = await runFullAnalysis(projectRoot, scan.structure, config, { noIgnore });
 
       let gitHistory: GitHistoryAnalysis | undefined;
       let temporalCouplings: TemporalCoupling[] | undefined;

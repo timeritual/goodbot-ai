@@ -18,6 +18,13 @@ import { findLayerViolations } from './layer-checker.js';
 import { runSolidAnalysis } from './solid.js';
 import { calculateHealthScore } from './health-score.js';
 import { loadIgnoreRules, filterSolidViolations, filterLayerViolations, filterBarrelViolations } from './ignore.js';
+import {
+  filterCyclesByFile,
+  filterLayerViolationsByFile,
+  filterBarrelViolationsByFile,
+  filterStabilityViolationsByFile,
+  filterSolidViolationsByCategory,
+} from './analysis-ignore.js';
 import { checkCustomRules } from './custom-rules.js';
 
 export type { DependencyAnalysis, DependencyAnalysisSummary, FullAnalysis, SolidAnalysis, HealthScore, HealthGrade, BarrelViolation } from './types.js';
@@ -175,6 +182,7 @@ export async function runFullAnalysis(
   projectRoot: string,
   structure: StructureAnalysis,
   config?: GoodbotConfig,
+  options: { noIgnore?: boolean } = {},
 ): Promise<FullAnalysis> {
   const startTime = Date.now();
 
@@ -215,11 +223,21 @@ export async function runFullAnalysis(
     solid.violations.push(...customViolations);
   }
 
-  // Apply ignore rules
+  // Apply legacy .goodbot/ignore file rules
   const ignoreRules = await loadIgnoreRules(projectRoot);
   dep.layerViolations = filterLayerViolations(dep.layerViolations, ignoreRules);
   dep.barrelViolations = filterBarrelViolations(dep.barrelViolations, ignoreRules);
   solid.violations = filterSolidViolations(solid.violations, ignoreRules);
+
+  // Apply analysis-scoped ignores from config (can be bypassed with --no-ignore)
+  const scopedIgnore = config?.analysis.ignore;
+  if (scopedIgnore && !options.noIgnore) {
+    dep.circularDependencies = filterCyclesByFile(dep.circularDependencies, scopedIgnore.circularDeps);
+    dep.layerViolations = filterLayerViolationsByFile(dep.layerViolations, scopedIgnore.layerViolations);
+    dep.barrelViolations = filterBarrelViolationsByFile(dep.barrelViolations, scopedIgnore.barrelViolations);
+    dep.stabilityViolations = filterStabilityViolationsByFile(dep.stabilityViolations, scopedIgnore.stabilityViolations);
+    solid.violations = filterSolidViolationsByCategory(solid.violations, scopedIgnore);
+  }
 
   // Health score
   const health = calculateHealthScore(dep, solid);

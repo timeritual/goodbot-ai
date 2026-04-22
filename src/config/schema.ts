@@ -77,6 +77,23 @@ export const GoodbotConfigSchema = z.object({
       deadExports: z.number().int().min(0).optional(),
       custom: z.number().int().min(0).optional(),
     }).default({}),
+    // Per-check file-glob suppressions. Files are still parsed for every check;
+    // matched files just don't contribute to the listed categories. Use this
+    // for well-known false positives (e.g., TypeORM entity cycles).
+    ignore: z.object({
+      circularDeps: z.array(z.string()).optional(),
+      layerViolations: z.array(z.string()).optional(),
+      barrelViolations: z.array(z.string()).optional(),
+      stabilityViolations: z.array(z.string()).optional(),
+      oversizedFiles: z.array(z.string()).optional(),
+      complexity: z.array(z.string()).optional(),
+      duplication: z.array(z.string()).optional(),
+      deadExports: z.array(z.string()).optional(),
+      dependencyInversion: z.array(z.string()).optional(),
+      interfaceSegregation: z.array(z.string()).optional(),
+      shallowModules: z.array(z.string()).optional(),
+      godModules: z.array(z.string()).optional(),
+    }).default({}),
   }).default({}),
   customRulesConfig: z.array(z.object({
     name: z.string(),

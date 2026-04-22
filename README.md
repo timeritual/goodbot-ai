@@ -92,8 +92,12 @@ goodbot init && goodbot generate
 
 ---
 
-## What's new in 0.6
+## What's new
 
+### 0.7
+- **Analysis-scoped ignores** — suppress specific checks (e.g., circular dependencies) for known false-positive patterns without excluding files from other checks. TypeORM/Mongoose entity cycles get sensible out-of-the-box defaults for API projects. New `--no-ignore` flag on `goodbot analyze` for audits.
+
+### 0.6
 - **System type detection + role-based layers** — goodbot classifies your project as `api`, `ui`, `mixed`, or `library` and applies a canonical stability ordering (Stable Dependency Principle) per type. Framework-specific role sets for Angular, Vue, Nuxt, NestJS.
 - **Role-aware violation output** — layer violations render as `[Domain/Entities] domain (L0) imports from [Controllers/Transport] controllers (L7)` with a plain-English explanation of why the direction is wrong.
 - **Safer re-runs** — `generate` uses `<!-- goodbot:start/end -->` markers to preserve user content across regenerations. Running generate twice no longer wipes your team notes below the goodbot section.
@@ -333,6 +337,7 @@ With `--git`, also analyzes git history:
 | `--json` | Output full analysis as JSON for programmatic consumption |
 | `--diagram` | Generate `architecture.md` with mermaid dependency graph |
 | `--git` | Include git history analysis (hotspots, AI commits, temporal coupling) |
+| `--no-ignore` | Bypass `analysis.ignore` rules in config (audit mode — see every violation) |
 | `--path <path>` | Analyze a specific project directory |
 
 ### `goodbot diff`
@@ -669,7 +674,9 @@ These rules target the specific ways AI-generated code degrades a codebase over 
 
 ## Managing Violations
 
-**Suppress false positives** with `.goodbot/ignore`:
+### `.goodbot/ignore` (legacy, file-level)
+
+Suppress all violations in specific files or entire directories — useful for opting out of the whole analysis on a path:
 
 ```
 # Ignore all violations in legacy code
@@ -682,7 +689,63 @@ src/contexts/SketchContext.tsx SRP
 src/test-utils/** BARREL
 ```
 
+### `analysis.ignore` (per-check, config-driven)
+
+For well-known false positives where you only want to suppress a **specific check**. Files still get parsed and still contribute to other checks — they just don't count toward the listed categories.
+
+The canonical use case: TypeORM / Mongoose / Prisma entities that import each other bidirectionally via decorator relationships form a large strongly-connected component. It's structurally unavoidable and runtime-safe, but without suppression it inflates the circular-dep count and costs 25 health points.
+
+```jsonc
+// .goodbot/config.json
+{
+  "analysis": {
+    "ignore": {
+      "circularDeps": ["**/entities/**", "**/models/**", "**/schemas/**"],
+      "oversizedFiles": ["**/*.generated.ts"],
+      "dependencyInversion": ["src/legacy/**"]
+    }
+  }
+}
+```
+
+**What each key suppresses:**
+
+| Key | Scope |
+|-----|-------|
+| `circularDeps` | Entire cycle dropped if ALL its files match; cycles with even one non-matching file are kept |
+| `layerViolations` | Per-file (the importing file) |
+| `barrelViolations` | Per-file |
+| `stabilityViolations` | Entire violation dropped if every edge-backing file matches |
+| `oversizedFiles` | SRP violations about file length |
+| `complexity` | SRP violations about cyclomatic complexity |
+| `duplication` | SRP violations about duplicated code |
+| `deadExports` | Dead export warnings |
+| `dependencyInversion` | DIP violations |
+| `interfaceSegregation` | ISP violations |
+| `shallowModules` | Shallow module warnings |
+| `godModules` | God module warnings |
+
+**Key invariants:**
+- `filesParsed` is unchanged — entities are still parsed for every check.
+- Category scope is strict: `oversizedFiles: ["**/*.entity.ts"]` only drops SRP-line-count violations in entity files. Complexity, DIP, or ISP violations in the same entity files still surface.
+- An ignored category's health contributor disappears from `analyze --json` output once its count hits 0.
+- `CODING_GUIDELINES.md`'s "Known Issues" section only renders sections whose count is > 0, so ignored categories drop out of the generated guardrails.
+
+`goodbot init --preset recommended` sets sensible defaults per framework. For NestJS, Express, FastAPI, Flask, and Django projects, `circularDeps` is pre-populated with `["**/entities/**", "**/models/**", "**/schemas/**"]`.
+
+Audit mode: pass `--no-ignore` to `goodbot analyze` to bypass all analysis-scoped ignores and see every violation.
+
+### Violation budgets
+
 **Accept known debt** with [violation budgets](#violation-budgets) — acknowledge violations without hiding them, and fail only when the count exceeds the budget.
+
+---
+
+### Which should I use?
+
+- `.goodbot/ignore` → entire files/directories you don't want analyzed at all (legacy, vendored code, generated test fixtures).
+- `analysis.ignore` → well-known false positives in an otherwise healthy area of the codebase (ORM entity cycles, generated-code complexity).
+- **Violation budgets** → known debt you want visible in reports but not failing CI until it grows past a threshold.
 
 ---
 

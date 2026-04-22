@@ -1,6 +1,6 @@
 {
   "name": "goodbot-ai",
-  "version": "0.6.5",
+  "version": "0.7.0",
   "description": "Auto-generate AI agent guardrail files for your project. Train your AI to be a good bot.",
   "type": "module",
   "bin": {
@@ -57,12 +57,14 @@
     "handlebars": "^4.7.8",
     "inquirer": "^9.3.0",
     "ora": "^8.0.1",
+    "picomatch": "^4.0.4",
     "zod": "^3.23.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/inquirer": "^9.0.9",
     "@types/node": "^20.0.0",
+    "@types/picomatch": "^4.0.3",
     "eslint": "^10.2.0",
     "tsx": "^4.19.0",
     "typescript": "^5.5.0",

@@ -1,5 +1,5 @@
 import type { GoodbotConfig } from './schema.js';
-import type { ScanResult } from '../scanners/index.js';
+import type { Framework, ScanResult } from '../scanners/index.js';
 import { frameworkDefaults } from './defaults.js';
 
 export type PresetName = 'strict' | 'recommended' | 'relaxed';
@@ -9,6 +9,28 @@ export const PRESET_DESCRIPTIONS: Record<PresetName, string> = {
   recommended: 'Balanced defaults — barrel imports recommended, all agent files, standard thresholds',
   relaxed: 'Minimal guardrails — basic guidelines and agent files only',
 };
+
+/**
+ * Sensible out-of-the-box analysis-scoped ignores. Backend API frameworks
+ * commonly have ORM entity files that form bidirectional cycles via decorator
+ * relationships (@OneToMany, @ManyToOne, etc.) — these are runtime-safe and
+ * shouldn't inflate the circular-dep count.
+ */
+export function defaultAnalysisIgnore(framework: Framework): GoodbotConfig['analysis']['ignore'] {
+  const entityGlobs = ['**/entities/**', '**/models/**', '**/schemas/**'];
+  switch (framework) {
+    case 'nest':
+    case 'express':
+    case 'fastapi':
+    case 'django':
+    case 'flask':
+      return { circularDeps: entityGlobs };
+    case 'node':
+      return { circularDeps: entityGlobs };
+    default:
+      return {};
+  }
+}
 
 export function buildPresetConfig(
   preset: PresetName,
@@ -66,6 +88,7 @@ export function buildPresetConfig(
       solid: true,
       thresholds: { maxFileLines: 300, maxBarrelExports: 15, maxModuleCoupling: 8 },
       budget: {},
+      ignore: defaultAnalysisIgnore(scan.framework.framework),
     },
     customRulesConfig: [],
     team: {},

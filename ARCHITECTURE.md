@@ -2,6 +2,19 @@
 
 High-level map of how goodbot turns a project directory into AI agent guardrail files — and how it detects when those guardrails drift from reality.
 
+## The immune framing
+
+Positioning docs describe goodbot as a "software immune system for your codebase." For contributors, that's a useful lens on the subsystems below, not a different architecture — the Scan/Analyze/Generate pipeline and the `.goodbot/` state files described in this document are the actual implementation; the immune vocabulary is a label on top of them:
+
+| Existing feature | Immune role |
+|---|---|
+| Canonical source (`CODING_GUIDELINES.md`) → generated agent files | The genome expressing itself into enforcement surfaces |
+| Drift detection (`diff` / `pr`) | The innate sensor |
+| Suppression lifecycle (reasons required, content-based IDs, orphan detection) | Proto-ratchet: tolerated exceptions, tracked, meant to shrink |
+| Re-init preservation of user customizations | Proto-adjudication: distinguishing "mine" from "yours" on regeneration |
+
+The forward-looking parts of the immune framing — adjudicated drift, incident-driven rules, self-tuning, inheritable rule packs — are not implemented and are not part of this architecture; see [docs/EVOLUTION.md](./docs/EVOLUTION.md) for that roadmap.
+
 ## Overview
 
 Goodbot is a pipeline that runs three passes over a project:

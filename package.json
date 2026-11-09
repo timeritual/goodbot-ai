@@ -1,7 +1,7 @@
 {
   "name": "goodbot-ai",
   "version": "0.13.0",
-  "description": "Auto-generate AI agent guardrail files for your project. Train your AI to be a good bot.",
+  "description": "A software immune system for your codebase: generates AI agent guardrails from one canonical source and detects when code drifts from them.",
   "type": "module",
   "bin": {
     "goodbot": "./bin/goodbot.js"
@@ -38,7 +38,12 @@
     "copilot",
     "cli",
     "coding-standards",
-    "vibe-coding"
+    "vibe-coding",
+    "immune-system",
+    "code-quality",
+    "drift-detection",
+    "ai-guardrails",
+    "architecture-enforcement"
   ],
   "author": "timeritual",
   "license": "MIT",

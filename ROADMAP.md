@@ -1,5 +1,7 @@
 # Goodbot Roadmap
 
+> **Scope note:** this document is the near-term feature roadmap (what's shipped, what's next, by version). For the longer-term "software immune system" vision — adjudicated drift, incidents becoming rules, self-tuning, inheritable rule packs — see [docs/EVOLUTION.md](./docs/EVOLUTION.md) instead. The two aren't in conflict: everything here is a step toward the prevention layer; EVOLUTION.md is about what gets built once prevention is solid.
+
 ## Vision
 
 Goodbot keeps AI guardrails honest as codebases evolve. In multi-developer AI-assisted codebases, guardrail files go stale almost immediately — a rule written in week 1 doesn't reflect week 3 patterns. Goodbot's job is to detect that drift and surface it before it causes damage.

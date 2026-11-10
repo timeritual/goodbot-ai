@@ -57,6 +57,8 @@ guardrails die today. This phase adds per-rule false-positive tracking, so goodb
 rules fire often and get overridden often. From that signal it proposes demotions (error → warn),
 threshold adjustments, or narrower scope for noisy rules — slowly, with hysteresis so a single bad
 week doesn't flip a rule off, and always as a suggestion a human reviews, never a silent change.
+An embryo of this already ships: `trend --effectiveness` tracks which rule categories improve or
+worsen over time — Phase 3 wraps the adjudicated proposal loop around that existing signal.
 
 ## Phase 4 — Germline
 

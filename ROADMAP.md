@@ -8,7 +8,7 @@ Goodbot keeps AI guardrails honest as codebases evolve. In multi-developer AI-as
 
 ---
 
-## Shipped (v0.3.x)
+## Shipped (v0.13.0)
 
 ### Core Analysis
 - Health grading (A+ to F) with weighted scoring across dependencies, stability, SOLID, architecture
@@ -58,7 +58,7 @@ Goodbot keeps AI guardrails honest as codebases evolve. In multi-developer AI-as
 ### Tooling
 - ESLint with TypeScript support
 - Prepublish validation (typecheck + lint + test + build)
-- 161 tests across 18 test files (analyzers, freshness, commands)
+- 293 tests across 25 test files (analyzers, freshness, commands)
 
 ---
 
@@ -77,7 +77,7 @@ Goodbot keeps AI guardrails honest as codebases evolve. In multi-developer AI-as
 **Priority:** High — Python is the most-requested non-JS language for AI-assisted codebases.
 
 ### CLI Integration Tests
-**Problem:** The 161 tests cover analyzers, freshness, and command pure functions — but no test exercises the full CLI flow (init -> generate -> analyze -> diff). A regression in command wiring or argument parsing wouldn't be caught.
+**Problem:** The 293 tests cover analyzers, freshness, and command pure functions — but no test exercises the full CLI flow (init -> generate -> analyze -> diff). A regression in command wiring or argument parsing wouldn't be caught.
 
 **Approach:**
 - Create a temp project fixture with a known structure (few TS files, known violations)

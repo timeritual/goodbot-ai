@@ -9,8 +9,8 @@
 <h1 align="center">goodbot</h1>
 
 <p align="center">
-  <strong>Train your AI to be a good bot.</strong><br/>
-  Auto-generate guardrail files that keep Claude, Cursor, Windsurf, Codex and Copilot aligned with your project's conventions — then detect when they go stale.
+  <strong>A software immune system for your codebase.</strong><br/>
+  goodbot shapes what AI agents write and verifies what they actually wrote — both driven by one canonical source, so the two can't quietly drift apart.
 </p>
 
 <p align="center">
@@ -19,21 +19,48 @@
 
 ---
 
-## Why goodbot
+## The problem
 
-AI agents are powerful but they don't know your rules. Without guardrails, they create god files, mix business logic into UI components, bypass your layer boundaries, and drift across agents (your `CLAUDE.md` says one thing, your `.cursorrules` says another).
+AI now writes a growing share of the code in most repos, and that shifts the bottleneck: the hard part isn't writing code anymore, it's trusting it without reading every line. The usual fix — a `CLAUDE.md` here, a `.cursorrules` there, a lint rule someone remembers to update — is guidelines and gates maintained by hand, which means they drift apart from each other and from the code itself within weeks.
 
-**goodbot solves three problems:**
-
-1. **Generate once, use everywhere.** One source of truth → `CLAUDE.md`, `.cursorrules`, `.windsurfrules`, `AGENTS.md`, `CODING_GUIDELINES.md`.
-2. **Make the rules adaptive.** Scans your actual codebase for framework conventions, architectural layers, and real violations — so guardrails match your code, not a generic template.
-3. **Detect when they go stale.** As your codebase evolves, goodbot tracks drift between what the guardrails claim and what the code actually looks like.
+goodbot treats that as an immune-system problem: **prevent** bad patterns from entering the codebase, and keep an honest, trackable record of the exceptions that genuinely are fine, so the system can get stricter over time instead of just older.
 
 > **New here?** Read **[HOW_IT_WORKS.md](./HOW_IT_WORKS.md)** for a plain-English walkthrough with a diagram of the full pipeline — what goodbot reads from your project, what it writes, and how drift detection works.
 
 ---
 
-## Install & run (60 seconds)
+## What it does today
+
+goodbot ships the **prevention** layer of that immune system — specifically, its two-sided core: shaping what gets written, and verifying what got written. Everything in this section is real and in the CLI right now. The longer-term vision (adjudicated drift, incident-driven rules, self-tuning, inheritable rule packs) is a separate, clearly-marked roadmap — see [Where this is going](#where-this-is-going) below.
+
+### Shape what gets written
+
+One canonical source — `CODING_GUIDELINES.md` — generates every other agent-facing file, so the rules only have to be written once:
+
+- **5-agent parity.** `CLAUDE.md`, `.cursorrules`, `.windsurfrules`, `AGENTS.md`, and `.cursorignore` are all generated from that same source, so Claude, Cursor, Windsurf, Codex, and Copilot read the same rules instead of five independently hand-maintained files that inevitably diverge.
+- **System-type detection.** goodbot classifies your project as API, UI, mixed, or library and applies the matching Stable Dependency Principle ordering (e.g. for a NestJS API: domain → repositories → services → controllers; for a React app: types → hooks → components → screens).
+- **Framework-aware role sets.** React, Angular, Vue, Next.js/Nuxt, NestJS, and Express/Node each get their own canonical layer ordering and business-logic placement table; Django, Flask, FastAPI, and Go get reasonable defaults.
+- **Re-init preservation.** Re-running `init` after a framework upgrade refreshes only the scan-detected fields and keeps everything you've hand-edited — distinguishing "goodbot's" from "yours" on every regeneration.
+
+### Verify what got written
+
+The same canonical source doubles as the check against reality — goodbot's sensor for drift:
+
+- **Drift detection.** `goodbot check` verifies the generated files still match what the config says they should; `goodbot freshness` compares a saved analysis snapshot against the current codebase and reports exactly what's drifted (health grade, circular deps, layer violations, dead exports, and more).
+- **Layer-violation analysis.** A real dependency graph is built from your imports — circular dependencies (Tarjan's algorithm), layer violations against your declared stability ordering, barrel-import bypasses, and SOLID checks (SRP, DIP, ISP) — an actual parse of your code, not a guess.
+- **PR-scoped drift.** `goodbot diff` shows only the violations introduced by the current branch, so review focuses on what changed.
+
+### Keep exceptions honest
+
+Not every violation is a bug — some are accepted tradeoffs. goodbot tracks those explicitly instead of letting them hide, which is the precondition for shrinking them over time:
+
+- **Suppressions require a reason.** `analysis.suppressions` entries need a `rule` + `file` (or `cycle`) + a real `reason` (minimum 8 characters, no literal `TODO:` placeholders) before `--apply` will write one.
+- **Content-based, stable IDs.** `goodbot suppress` lists violations with IDs like `cycle-app-database` that stay the same while the violation exists and disappear the moment it's fixed — nothing silently points at the wrong thing later.
+- **Orphan detection.** Every `analyze`/`generate` run flags suppressions that no longer match any real violation, and `goodbot check --strict` fails CI on them — so a stale suppression can't quietly keep disabling a guardrail after the code it excused is gone.
+
+---
+
+## Quick start
 
 ```bash
 npx goodbot-ai init              # interactive, or add --preset recommended
@@ -60,7 +87,7 @@ Run `goodbot presets` to see a side-by-side comparison.
 
 ## The goodbot lifecycle
 
-goodbot is designed to fit into your team's workflow at four moments:
+goodbot is designed to fit into your team's workflow at five moments:
 
 ### 1. Day 1 — Onboard the codebase
 
@@ -386,9 +413,25 @@ You can always edit `conventions.mainBranch` directly in `.goodbot/config.json` 
 
 ---
 
+## Where this is going
+
+> **Roadmap — none of this is built yet.** See [docs/EVOLUTION.md](./docs/EVOLUTION.md) for the full version of this plan.
+
+Today, when `freshness` or `diff` reports drift, a human reads the report and decides what to do about it off to the side — goodbot doesn't record that decision anywhere. The plan is to make that decision structured: every drift finding would get adjudicated as either **reject** (the code is wrong, the gate holds) or **accept-as-evolution** (the architecture legitimately changed, so the canonical source updates and every generated file regenerates in the same PR, with provenance recorded). From there, an escaped incident could become a proposed permanent rule — an "antibody" — carrying its own provenance ("this rule exists because of incident #N"). Rules that turn out to be noisy would get flagged for demotion or retuning before a team gets fed up and deletes them outright. And rule-sets proven on one codebase could ship as inheritable defaults for a new one, the way a useful adaptation propagates to offspring.
+
+None of this exists yet, and it comes with one non-negotiable constraint: **goodbot never changes itself or the host without review.** Every one of these mutations would be a proposed diff a human approves — "evolves" means *proposes, with evidence*, never silent self-modification.
+
+---
+
+## Scope & honesty note
+
+goodbot was built to solve a real problem on a real production codebase, then published open-source — it isn't a funded product with adoption numbers or a roadmap team behind it. The immune-system framing in this README is a working model for thinking about how guardrail generation, drift detection, and exception-tracking fit together, not a literal biology claim or a disguised feature list. Where the metaphor and the actual engineering disagree, the engineering wins: if a section above says a command does something, trust that; treat the immune language as framing, not spec.
+
+---
+
 ## Why "goodbot"?
 
-AI coding agents are like eager interns — fast, capable, and in desperate need of clear rules. **goodbot** is obedience training for your AI: set the rules once, enforce them everywhere, catch drift before it ships.
+AI coding agents are like eager interns — fast, capable, and in desperate need of clear rules. **goodbot** is obedience training for your AI: set the rules once, enforce them everywhere, catch drift before it ships. The immune-system framing above is the bigger picture this fits into — the name is older than that framing, but the idea was always the same: rules an AI actually follows, checked, not assumed.
 
 ---
 
@@ -401,10 +444,13 @@ npm install
 npx tsx src/index.ts --help    # run in dev mode
 ```
 
-Two docs to orient:
+This repo runs goodbot on itself: the `CLAUDE.md`, `AGENTS.md`, and `CODING_GUIDELINES.md` at the root are goodbot's own generated output (see the "Generated by goodbot" footer in each). Don't hand-edit them — change `.goodbot/config.json` and re-run `goodbot generate`.
+
+Three docs to orient:
 
 - **[HOW_IT_WORKS.md](./HOW_IT_WORKS.md)** — end-user mental model (what goodbot does, what state it keeps, how drift detection works).
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** — contributor map (subsystem layout, key design decisions, extension points).
+- **[docs/EVOLUTION.md](./docs/EVOLUTION.md)** — the roadmap for where the immune-system framing is headed next, and what's explicitly not built yet.
 
 Issues and PRs welcome.
 

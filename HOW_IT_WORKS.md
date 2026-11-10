@@ -2,6 +2,19 @@
 
 A plain-English walkthrough of what goodbot actually does when you run it. If you want to know how the codebase is structured internally, see [ARCHITECTURE.md](./ARCHITECTURE.md) instead.
 
+## The immune framing
+
+goodbot describes itself as a "software immune system for your codebase." That's a framing, not a rename of anything below — every mechanism in this document (scanning, analysis, generation, snapshots, freshness) is the same mechanism whether or not you think in immune-system terms. The framing is useful because it maps cleanly onto what's actually implemented:
+
+| Existing feature | Immune role |
+|---|---|
+| Canonical source (`CODING_GUIDELINES.md`) → generated agent files | The genome expressing itself into enforcement surfaces |
+| Drift detection (`check`, `freshness`, `diff`) | The innate sensor |
+| Suppression lifecycle (reasons required, content-based IDs, orphan detection) | Proto-ratchet: tolerated exceptions, tracked, meant to shrink |
+| Re-init preservation of user customizations | Proto-adjudication: distinguishing "mine" from "yours" on regeneration |
+
+Everything above this line already ships. The rest of the immune system — a real adjudication loop, incidents becoming proposed rules, self-tuning, inheritable rule packs — doesn't exist yet; see [docs/EVOLUTION.md](./docs/EVOLUTION.md) for that roadmap. What follows below is the plain technical walkthrough.
+
 ## The one-sentence version
 
 Goodbot reads your project, figures out what kind of codebase it is and what rules it already follows, and writes those rules down in formats that every AI coding agent (Claude, Cursor, Windsurf, Codex, Copilot) can read — and tells you when your code starts drifting from what the rules claim.
